@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo
+namespace Nemo;
+
+public enum CacheRepresentation
 {
-    public enum CacheRepresentation
-    {
-        None, 
-        LazyList, 
-        List
-    }
+    None, 
+    LazyList, 
+    List
 }

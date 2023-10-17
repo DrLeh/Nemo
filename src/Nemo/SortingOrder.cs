@@ -1,8 +1,7 @@
-namespace Nemo
+namespace Nemo;
+
+public enum SortingOrder
 {
-    public enum SortingOrder
-    {
-        Ascending,
-        Descending
-    }
+    Ascending,
+    Descending
 }

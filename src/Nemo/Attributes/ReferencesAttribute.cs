@@ -3,22 +3,21 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo.Attributes
+namespace Nemo.Attributes;
+
+[AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
+public sealed class ReferencesAttribute : PropertyAttribute
 {
-    [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
-    public sealed class ReferencesAttribute : PropertyAttribute
+    public ReferencesAttribute(Type parent)
     {
-        public ReferencesAttribute(Type parent)
-        {
-            Parent = parent;
-        }
-
-        public Type Parent
-        {
-            get;
-            private set;
-        }
-
-        public int Position { get; set; }
+        Parent = parent;
     }
+
+    public Type Parent
+    {
+        get;
+        private set;
+    }
+
+    public int Position { get; set; }
 }

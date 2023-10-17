@@ -2,27 +2,26 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Nemo.Configuration
+namespace Nemo.Configuration;
+
+public class ConnectionStringSettingsCollection : List<ConnectionStringSettings>
 {
-    public class ConnectionStringSettingsCollection : List<ConnectionStringSettings>
+    public ConnectionStringSettingsCollection()
     {
-        public ConnectionStringSettingsCollection()
-        {
-        }
+    }
 
-        public ConnectionStringSettingsCollection(int capacity) : base(capacity)
-        {
-        }
+    public ConnectionStringSettingsCollection(int capacity) : base(capacity)
+    {
+    }
 
-        public ConnectionStringSettingsCollection(IEnumerable<ConnectionStringSettings> collection) : base(collection)
-        {
-        }
+    public ConnectionStringSettingsCollection(IEnumerable<ConnectionStringSettings> collection) : base(collection)
+    {
+    }
 
-        public bool TryGetValue(string key, out ConnectionStringSettings value)
-        {
-            var found = Find(m => m.Name == key);
-            value = found;
-            return found != null;
-        }
+    public bool TryGetValue(string key, out ConnectionStringSettings value)
+    {
+        var found = Find(m => m.Name == key);
+        value = found;
+        return found != null;
     }
 }

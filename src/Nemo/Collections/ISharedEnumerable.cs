@@ -4,22 +4,21 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Nemo.Collections
+namespace Nemo.Collections;
+
+public interface ISharedEnumerable<T> : IEnumerable<T>
 {
-    public interface ISharedEnumerable<T> : IEnumerable<T>
+    NextResult<T> Next();
+}
+
+public class NextResult<T>
+{
+    internal NextResult(bool success, T value)
     {
-        NextResult<T> Next();
+        Success = success;
+        Value = value;
     }
 
-    public class NextResult<T>
-    {
-        internal NextResult(bool success, T value)
-        {
-            Success = success;
-            Value = value;
-        }
-
-        public bool Success { get; private set; }
-        public T Value { get; private set; }
-    }
+    public bool Success { get; private set; }
+    public T Value { get; private set; }
 }

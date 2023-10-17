@@ -8,93 +8,92 @@ using System.Linq;
 using System.Data.Common;
 using Nemo.Configuration;
 
-namespace Nemo.Collections
+namespace Nemo.Collections;
+
+internal class EagerLoadEnumerable<T> : IEnumerable<T>
+    where T : class
 {
-    internal class EagerLoadEnumerable<T> : IEnumerable<T>
-        where T : class
+    private readonly Dictionary<string, Type> _sqlMap;
+    private readonly List<string> _sqlOrder;
+    private Func<string, IList<Type>, IEnumerable<T>> _load;
+
+    public EagerLoadEnumerable(IEnumerable<string> sql, IEnumerable<Type> types, Func<string, IList<Type>, IEnumerable<T>> load, Expression<Func<T, bool>> predicate, DialectProvider provider, SelectOption selectOption, string connectionName, DbConnection connection, int page, int pageSize, int skipCount, INemoConfiguration config)
     {
-        private readonly Dictionary<string, Type> _sqlMap;
-        private readonly List<string> _sqlOrder;
-        private Func<string, IList<Type>, IEnumerable<T>> _load;
+        _sqlOrder = sql.ToList();
+        _sqlMap = _sqlOrder.Zip(types, (s, t) => new { Key = s, Value = t }).ToDictionary(t => t.Key, t => t.Value);
+        _load = load;
+        Predicate = predicate;
+        Provider = provider;
+        SelectOption = selectOption;
+        ConnectionName = connectionName;
+        Connection = connection;
+        Page = page;
+        PageSize = pageSize;
+        SkipCount = skipCount;
+        Configuration = config;
+    }
 
-        public EagerLoadEnumerable(IEnumerable<string> sql, IEnumerable<Type> types, Func<string, IList<Type>, IEnumerable<T>> load, Expression<Func<T, bool>> predicate, DialectProvider provider, SelectOption selectOption, string connectionName, DbConnection connection, int page, int pageSize, int skipCount, INemoConfiguration config)
+    public IEnumerator<T> GetEnumerator()
+    {
+        var types = _sqlMap.Arrange(_sqlOrder, t => t.Key).Select(t => t.Value).ToArray();
+        var result = _load(_sqlOrder.ToDelimitedString("; "), types);
+
+        var multiresult = result as IMultiResult;
+        if (multiresult != null)
         {
-            _sqlOrder = sql.ToList();
-            _sqlMap = _sqlOrder.Zip(types, (s, t) => new { Key = s, Value = t }).ToDictionary(t => t.Key, t => t.Value);
-            _load = load;
-            Predicate = predicate;
-            Provider = provider;
-            SelectOption = selectOption;
-            ConnectionName = connectionName;
-            Connection = connection;
-            Page = page;
-            PageSize = pageSize;
-            SkipCount = skipCount;
-            Configuration = config;
+            result = multiresult.Aggregate<T>(Configuration);
         }
 
-        public IEnumerator<T> GetEnumerator()
+        if (SelectOption == SelectOption.First)
         {
-            var types = _sqlMap.Arrange(_sqlOrder, t => t.Key).Select(t => t.Value).ToArray();
-            var result = _load(_sqlOrder.ToDelimitedString("; "), types);
-
-            var multiresult = result as IMultiResult;
-            if (multiresult != null)
-            {
-                result = multiresult.Aggregate<T>(Configuration);
-            }
-
-            if (SelectOption == SelectOption.First)
-            {
-                return new List<T> { result.First() }.GetEnumerator();
-            }
-
-            if (SelectOption != SelectOption.FirstOrDefault)
-            {
-                return result.GetEnumerator();
-            }
-
-            var item = result.FirstOrDefault();
-            return item != null ? new List<T> { item }.GetEnumerator() : Enumerable.Empty<T>().GetEnumerator();
+            return new List<T> { result.First() }.GetEnumerator();
         }
 
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        if (SelectOption != SelectOption.FirstOrDefault)
         {
-            return GetEnumerator();
+            return result.GetEnumerator();
         }
 
-        internal Expression<Func<T, bool>> Predicate { get; }
+        var item = result.FirstOrDefault();
+        return item != null ? new List<T> { item }.GetEnumerator() : Enumerable.Empty<T>().GetEnumerator();
+    }
 
-        internal DialectProvider Provider { get; }
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
 
-        internal SelectOption SelectOption { get; }
+    internal Expression<Func<T, bool>> Predicate { get; }
 
-        internal string ConnectionName { get; }
+    internal DialectProvider Provider { get; }
 
-        internal DbConnection Connection { get; }
+    internal SelectOption SelectOption { get; }
 
-        internal int Page { get; }
+    internal string ConnectionName { get; }
 
-        internal int PageSize { get; }
+    internal DbConnection Connection { get; }
 
-        public int SkipCount { get; }
+    internal int Page { get; }
 
-        public INemoConfiguration Configuration { get; }
+    internal int PageSize { get; }
 
-        public IEnumerable<T> Union(IEnumerable<T> other)
+    public int SkipCount { get; }
+
+    public INemoConfiguration Configuration { get; }
+
+    public IEnumerable<T> Union(IEnumerable<T> other)
+    {
+        var eagerLoader = other as EagerLoadEnumerable<T>;
+        if (eagerLoader != null)
         {
-            var eagerLoader = other as EagerLoadEnumerable<T>;
-            if (eagerLoader != null)
+            _load = eagerLoader._load;
+            foreach (var item in eagerLoader._sqlMap.Where(item => !_sqlMap.ContainsKey(item.Key)))
             {
-                _load = eagerLoader._load;
-                foreach (var item in eagerLoader._sqlMap.Where(item => !_sqlMap.ContainsKey(item.Key)))
-                {
-                    _sqlOrder.Add(item.Key);
-                    _sqlMap.Add(item.Key, item.Value);
-                }
-                return this;
+                _sqlOrder.Add(item.Key);
+                _sqlMap.Add(item.Key, item.Value);
             }
-            return Enumerable.Union(this, other);
+            return this;
         }
+        return Enumerable.Union(this, other);
     }
 }

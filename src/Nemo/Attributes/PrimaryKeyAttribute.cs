@@ -5,11 +5,10 @@ using System.Text;
 using System.Data;
 using System.Collections;
 
-namespace Nemo.Attributes
+namespace Nemo.Attributes;
+
+[AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
+public sealed class PrimaryKeyAttribute : PropertyAttribute
 {
-    [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
-    public sealed class PrimaryKeyAttribute : PropertyAttribute
-    {
-        public int Position { get; set; }
-    }
+    public int Position { get; set; }
 }

@@ -3,20 +3,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo.Collections.Comparers
+namespace Nemo.Collections.Comparers;
+
+public class ComparisonComparer<T> : IComparer<T>
 {
-    public class ComparisonComparer<T> : IComparer<T>
+    private readonly Comparison<T> _comparison;
+
+    public ComparisonComparer(Comparison<T> comparison)
     {
-        private readonly Comparison<T> _comparison;
+        _comparison = comparison;
+    }
 
-        public ComparisonComparer(Comparison<T> comparison)
-        {
-            _comparison = comparison;
-        }
-
-        public int Compare(T x, T y)
-        {
-            return _comparison(x, y);
-        }
+    public int Compare(T x, T y)
+    {
+        return _comparison(x, y);
     }
 }

@@ -3,15 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo.Reflection
+namespace Nemo.Reflection;
+
+internal static class FastImplementor<T>
 {
-    internal static class FastImplementor<T>
+    static FastImplementor()
     {
-        static FastImplementor()
-        {
-            Instance = Adapter.InternalImplement<T>();
-        }
-        // ReSharper disable once StaticMemberInGenericType
-        internal static readonly Activator.ObjectActivator Instance;
+        Instance = Adapter.InternalImplement<T>();
     }
+    // ReSharper disable once StaticMemberInGenericType
+    internal static readonly Activator.ObjectActivator Instance;
 }

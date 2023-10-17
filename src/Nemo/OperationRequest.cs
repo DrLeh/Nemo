@@ -8,125 +8,124 @@ using System.Collections.Generic;
 using Nemo.Configuration;
 using Nemo.Data;
 
-namespace Nemo
+namespace Nemo;
+
+[Serializable]
+public class OperationRequest
 {
-    [Serializable]
-    public class OperationRequest
+    private string _connectionString = null;
+    private Param[] _parameters = null;
+    private OperationReturnType _returnType = OperationReturnType.Guess;
+    private OperationType _operationType = OperationType.Guess;
+    
+    [NonSerialized]
+    private DbConnection _connection = null;
+    [NonSerialized]
+    private DbTransaction _transaction = null;
+    [NonSerialized]
+    private INemoConfiguration _configuration = null;
+
+    public string Operation { get; set; }
+
+    public string ConnectionName { get; set; }
+
+    public DbConnection Connection
     {
-        private string _connectionString = null;
-        private Param[] _parameters = null;
-        private OperationReturnType _returnType = OperationReturnType.Guess;
-        private OperationType _operationType = OperationType.Guess;
-        
-        [NonSerialized]
-        private DbConnection _connection = null;
-        [NonSerialized]
-        private DbTransaction _transaction = null;
-        [NonSerialized]
-        private INemoConfiguration _configuration = null;
-
-        public string Operation { get; set; }
-
-        public string ConnectionName { get; set; }
-
-        public DbConnection Connection
+        get
         {
-            get
+            if (_connection == null && ConnectionName.NullIfEmpty() == null && _connectionString.NullIfEmpty() != null)
             {
-                if (_connection == null && ConnectionName.NullIfEmpty() == null && _connectionString.NullIfEmpty() != null)
-                {
-                    _connection = DbFactory.CreateConnection(_connectionString, _configuration);
-                }
-                return _connection;
+                _connection = DbFactory.CreateConnection(_connectionString, _configuration);
             }
-            set
+            return _connection;
+        }
+        set
+        {
+            _connection = value;
+            if (_connection != null)
             {
-                _connection = value;
-                if (_connection != null)
-                {
-                    _connectionString = _connection.ConnectionString;
-                }
+                _connectionString = _connection.ConnectionString;
             }
         }
-        
-        public DbTransaction Transaction 
+    }
+    
+    public DbTransaction Transaction 
+    {
+        get
         {
-            get
+            return _transaction;
+        }
+        set
+        {
+            _transaction = value;
+            if (_transaction?.Connection != null)
             {
-                return _transaction;
-            }
-            set
-            {
-                _transaction = value;
-                if (_transaction?.Connection != null)
-                {
-                    Connection = _transaction.Connection;
-                }
+                Connection = _transaction.Connection;
             }
         }
-        
-        public bool InTransaction
+    }
+    
+    public bool InTransaction
+    {
+        get
         {
-            get
+            return Transaction != null || System.Transactions.Transaction.Current != null;
+        }
+    }
+
+    public IEnumerable<Param> Parameters
+    {
+        get
+        {
+            return _parameters ?? Enumerable.Empty<Param>();
+        }
+        set
+        {
+            if (value != null)
             {
-                return Transaction != null || System.Transactions.Transaction.Current != null;
+                _parameters = value.ToArray();
             }
         }
+    }
 
-        public IEnumerable<Param> Parameters
+    public IList<Type> Types
+    {
+        get;
+        set;
+    }
+
+    public OperationReturnType ReturnType
+    {
+        get
         {
-            get
-            {
-                return _parameters ?? Enumerable.Empty<Param>();
-            }
-            set
-            {
-                if (value != null)
-                {
-                    _parameters = value.ToArray();
-                }
-            }
+            return _returnType;
         }
-
-        public IList<Type> Types
+        set
         {
-            get;
-            set;
+            _returnType = value;
         }
+    }
 
-        public OperationReturnType ReturnType
+    public OperationType OperationType
+    {
+        get
         {
-            get
-            {
-                return _returnType;
-            }
-            set
-            {
-                _returnType = value;
-            }
+            return _operationType;
         }
-
-        public OperationType OperationType
+        set
         {
-            get
-            {
-                return _operationType;
-            }
-            set
-            {
-                _operationType = value;
-            }
+            _operationType = value;
         }
+    }
 
-        public bool CaptureException { get; set; }
+    public bool CaptureException { get; set; }
 
-        public string SchemaName { get; set; }
+    public string SchemaName { get; set; }
 
-        public INemoConfiguration Configuration { get; set; }
+    public INemoConfiguration Configuration { get; set; }
 
-        public bool IsValid()
-        {
-            return _transaction != null || _connection != null || !string.IsNullOrEmpty(_connectionString) || (Types != null && Types.Count > 0);
-        }
+    public bool IsValid()
+    {
+        return _transaction != null || _connection != null || !string.IsNullOrEmpty(_connectionString) || (Types != null && Types.Count > 0);
     }
 }

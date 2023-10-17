@@ -3,300 +3,299 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Nemo.Collections
+namespace Nemo.Collections;
+
+public interface ISet 
 {
-    public interface ISet 
+    Type Comparer { get; }
+}
+
+public class HashList<T> : IList<T>, IList, ISet<T>, ISet
+{
+    private readonly HashSet<T> _set;
+    private List<T> _list;
+    private readonly IEqualityComparer<T> _comparer;
+    private readonly object _syncRoot = new object();
+
+    public HashList() : this(EqualityComparer<T>.Default) { }
+
+    public HashList(IEnumerable<T> items) : this(items, EqualityComparer<T>.Default) { }
+
+    public HashList(IEqualityComparer<T> comparer)
     {
-        Type Comparer { get; }
+        _comparer = comparer;
+        _set = new HashSet<T>(_comparer);
+        _list = new List<T>();
     }
 
-    public class HashList<T> : IList<T>, IList, ISet<T>, ISet
+    public HashList(IEnumerable<T> items, IEqualityComparer<T> comparer)
     {
-        private readonly HashSet<T> _set;
-        private List<T> _list;
-        private readonly IEqualityComparer<T> _comparer;
-        private readonly object _syncRoot = new object();
+        _comparer = comparer;
+        _set = new HashSet<T>(items, _comparer);
+        _list = _set.ToList();
+    }
 
-        public HashList() : this(EqualityComparer<T>.Default) { }
-
-        public HashList(IEnumerable<T> items) : this(items, EqualityComparer<T>.Default) { }
-
-        public HashList(IEqualityComparer<T> comparer)
+    public Type Comparer
+    {
+        get
         {
-            _comparer = comparer;
-            _set = new HashSet<T>(_comparer);
-            _list = new List<T>();
+            return _comparer.GetType();
         }
+    }
 
-        public HashList(IEnumerable<T> items, IEqualityComparer<T> comparer)
+    #region IList<T> Members
+
+    public int IndexOf(T item)
+    {
+        return _list.IndexOf(item);
+    }
+
+    public void Insert(int index, T item)
+    {
+        if (_set.Contains(item)) return;
+        _list.Insert(index, item);
+        _set.Add(item);
+    }
+
+    public void RemoveAt(int index)
+    {
+        if (index > -1 && index < _list.Count)
         {
-            _comparer = comparer;
-            _set = new HashSet<T>(items, _comparer);
-            _list = _set.ToList();
+            _set.Remove(_list[index]);
         }
+        _list.RemoveAt(index);
+    }
 
-        public Type Comparer
+    public T this[int index]
+    {
+        get
         {
-            get
-            {
-                return _comparer.GetType();
-            }
+            return _list[index];
         }
-
-        #region IList<T> Members
-
-        public int IndexOf(T item)
+        set
         {
-            return _list.IndexOf(item);
-        }
-
-        public void Insert(int index, T item)
-        {
-            if (_set.Contains(item)) return;
-            _list.Insert(index, item);
-            _set.Add(item);
-        }
-
-        public void RemoveAt(int index)
-        {
+            if (_set.Contains(value)) return;
             if (index > -1 && index < _list.Count)
             {
                 _set.Remove(_list[index]);
             }
-            _list.RemoveAt(index);
+
+            _list[index] = value;
+            _set.Add(value);
         }
-
-        public T this[int index]
-        {
-            get
-            {
-                return _list[index];
-            }
-            set
-            {
-                if (_set.Contains(value)) return;
-                if (index > -1 && index < _list.Count)
-                {
-                    _set.Remove(_list[index]);
-                }
-
-                _list[index] = value;
-                _set.Add(value);
-            }
-        }
-
-        #endregion
-
-        #region ICollection<T> Members
-
-        public void Add(T item)
-        {
-            if (_set.Contains(item)) return;
-            _list.Add(item);
-            _set.Add(item);
-        }
-
-        public void Clear()
-        {
-            _list.Clear();
-            _set.Clear();
-        }
-
-        public bool Contains(T item)
-        {
-            return _set.Contains(item);
-        }
-
-        public void CopyTo(T[] array, int arrayIndex)
-        {
-            _list.CopyTo(array, arrayIndex);
-        }
-
-        public int Count
-        {
-            get
-            {
-                return _list.Count;
-            }
-        }
-
-        public bool IsReadOnly
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        public bool Remove(T item)
-        {
-            var index = _list.FindIndex(i => _set.Contains(i));
-            if (index <= -1 || !_set.Remove(item)) return false;
-            _list.RemoveAt(index);
-            return true;
-        }
-
-        #endregion
-
-        #region IEnumerable<T> Members
-
-        public IEnumerator<T> GetEnumerator()
-        {
-            return _list.GetEnumerator();
-        }
-
-        #endregion
-
-        #region IEnumerable Members
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        #endregion
-
-        #region IList Members
-
-        public int Add(object value)
-        {
-            var oldCount = Count;
-            Add((T)value);
-            if (oldCount == Count)
-            {
-                return -1;
-            }
-            return Count - 1;
-        }
-
-        public bool Contains(object value)
-        {
-            return Contains((T)value);
-        }
-
-        public int IndexOf(object value)
-        {
-            return IndexOf((T)value);
-        }
-
-        public void Insert(int index, object value)
-        {
-            Insert(index, (T)value);
-        }
-
-        public bool IsFixedSize
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        public void Remove(object value)
-        {
-            Remove((T)value);
-        }
-
-        object IList.this[int index]
-        {
-            get
-            {
-                return this[index];
-            }
-            set
-            {
-                this[index] = (T)value;
-            }
-        }
-
-        #endregion
-
-        #region ICollection Members
-
-        public void CopyTo(System.Array array, int index)
-        {
-            CopyTo((T[])array, index);
-        }
-
-        public bool IsSynchronized
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        public object SyncRoot
-        {
-            get
-            {
-                return _syncRoot;
-            }
-        }
-
-        #endregion
-
-        #region ISet<T> Members
-
-        bool ISet<T>.Add(T item)
-        {
-            return Add((object)item) > -1;
-        }
-
-        void ISet<T>.ExceptWith(IEnumerable<T> other)
-        {
-            _set.ExceptWith(other);
-            _list = _list.Except(other, _set.Comparer).ToList();
-        }
-
-        void ISet<T>.IntersectWith(IEnumerable<T> other)
-        {
-            _set.IntersectWith(other);
-            _list = _list.Intersect(other, _set.Comparer).ToList();
-        }
-
-        bool ISet<T>.IsProperSubsetOf(IEnumerable<T> other)
-        {
-            return _set.IsProperSubsetOf(other);
-        }
-
-        bool ISet<T>.IsProperSupersetOf(IEnumerable<T> other)
-        {
-            return _set.IsProperSupersetOf(other);
-        }
-
-        bool ISet<T>.IsSubsetOf(IEnumerable<T> other)
-        {
-            return _set.IsSubsetOf(other);
-        }
-
-        bool ISet<T>.IsSupersetOf(IEnumerable<T> other)
-        {
-            return _set.IsSupersetOf(other);
-        }
-
-        bool ISet<T>.Overlaps(IEnumerable<T> other)
-        {
-            return _set.Overlaps(other);
-        }
-
-        bool ISet<T>.SetEquals(IEnumerable<T> other)
-        {
-            return _set.SetEquals(other);
-        }
-
-        void ISet<T>.SymmetricExceptWith(IEnumerable<T> other)
-        {
-            _set.SymmetricExceptWith(other);
-            _list = _list.Except(other, _set.Comparer).Union(other.Except(_list, _set.Comparer)).ToList();
-        }
-
-        void ISet<T>.UnionWith(IEnumerable<T> other)
-        {
-            _set.UnionWith(other);
-            _list = _list.Union(other, _set.Comparer).ToList();
-        }
-
-        #endregion
     }
+
+    #endregion
+
+    #region ICollection<T> Members
+
+    public void Add(T item)
+    {
+        if (_set.Contains(item)) return;
+        _list.Add(item);
+        _set.Add(item);
+    }
+
+    public void Clear()
+    {
+        _list.Clear();
+        _set.Clear();
+    }
+
+    public bool Contains(T item)
+    {
+        return _set.Contains(item);
+    }
+
+    public void CopyTo(T[] array, int arrayIndex)
+    {
+        _list.CopyTo(array, arrayIndex);
+    }
+
+    public int Count
+    {
+        get
+        {
+            return _list.Count;
+        }
+    }
+
+    public bool IsReadOnly
+    {
+        get
+        {
+            return false;
+        }
+    }
+
+    public bool Remove(T item)
+    {
+        var index = _list.FindIndex(i => _set.Contains(i));
+        if (index <= -1 || !_set.Remove(item)) return false;
+        _list.RemoveAt(index);
+        return true;
+    }
+
+    #endregion
+
+    #region IEnumerable<T> Members
+
+    public IEnumerator<T> GetEnumerator()
+    {
+        return _list.GetEnumerator();
+    }
+
+    #endregion
+
+    #region IEnumerable Members
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+
+    #endregion
+
+    #region IList Members
+
+    public int Add(object value)
+    {
+        var oldCount = Count;
+        Add((T)value);
+        if (oldCount == Count)
+        {
+            return -1;
+        }
+        return Count - 1;
+    }
+
+    public bool Contains(object value)
+    {
+        return Contains((T)value);
+    }
+
+    public int IndexOf(object value)
+    {
+        return IndexOf((T)value);
+    }
+
+    public void Insert(int index, object value)
+    {
+        Insert(index, (T)value);
+    }
+
+    public bool IsFixedSize
+    {
+        get
+        {
+            return false;
+        }
+    }
+
+    public void Remove(object value)
+    {
+        Remove((T)value);
+    }
+
+    object IList.this[int index]
+    {
+        get
+        {
+            return this[index];
+        }
+        set
+        {
+            this[index] = (T)value;
+        }
+    }
+
+    #endregion
+
+    #region ICollection Members
+
+    public void CopyTo(System.Array array, int index)
+    {
+        CopyTo((T[])array, index);
+    }
+
+    public bool IsSynchronized
+    {
+        get
+        {
+            return false;
+        }
+    }
+
+    public object SyncRoot
+    {
+        get
+        {
+            return _syncRoot;
+        }
+    }
+
+    #endregion
+
+    #region ISet<T> Members
+
+    bool ISet<T>.Add(T item)
+    {
+        return Add((object)item) > -1;
+    }
+
+    void ISet<T>.ExceptWith(IEnumerable<T> other)
+    {
+        _set.ExceptWith(other);
+        _list = _list.Except(other, _set.Comparer).ToList();
+    }
+
+    void ISet<T>.IntersectWith(IEnumerable<T> other)
+    {
+        _set.IntersectWith(other);
+        _list = _list.Intersect(other, _set.Comparer).ToList();
+    }
+
+    bool ISet<T>.IsProperSubsetOf(IEnumerable<T> other)
+    {
+        return _set.IsProperSubsetOf(other);
+    }
+
+    bool ISet<T>.IsProperSupersetOf(IEnumerable<T> other)
+    {
+        return _set.IsProperSupersetOf(other);
+    }
+
+    bool ISet<T>.IsSubsetOf(IEnumerable<T> other)
+    {
+        return _set.IsSubsetOf(other);
+    }
+
+    bool ISet<T>.IsSupersetOf(IEnumerable<T> other)
+    {
+        return _set.IsSupersetOf(other);
+    }
+
+    bool ISet<T>.Overlaps(IEnumerable<T> other)
+    {
+        return _set.Overlaps(other);
+    }
+
+    bool ISet<T>.SetEquals(IEnumerable<T> other)
+    {
+        return _set.SetEquals(other);
+    }
+
+    void ISet<T>.SymmetricExceptWith(IEnumerable<T> other)
+    {
+        _set.SymmetricExceptWith(other);
+        _list = _list.Except(other, _set.Comparer).Union(other.Except(_list, _set.Comparer)).ToList();
+    }
+
+    void ISet<T>.UnionWith(IEnumerable<T> other)
+    {
+        _set.UnionWith(other);
+        _list = _list.Union(other, _set.Comparer).ToList();
+    }
+
+    #endregion
 }

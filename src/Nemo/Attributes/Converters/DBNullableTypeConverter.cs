@@ -1,13 +1,13 @@
 using System;
 
-namespace Nemo.Attributes.Converters
-{
+namespace Nemo.Attributes.Converters;
+
 	public class DBNullableTypeConverter<T> : ITypeConverter<object, T?> 
-        where T : struct
+    where T : struct
 	{
 		#region ITypeConverter<object,T?> Members
 		
-        T? ITypeConverter<object, T?>.ConvertForward(object from)
+    T? ITypeConverter<object, T?>.ConvertForward(object from)
 		{
 			if (from == null || from is DBNull)
 			{
@@ -31,6 +31,5 @@ namespace Nemo.Attributes.Converters
 			}
 		}
 		
-        #endregion
+    #endregion
 	}
-}

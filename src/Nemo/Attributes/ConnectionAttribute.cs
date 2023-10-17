@@ -3,32 +3,31 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo.Attributes
+namespace Nemo.Attributes;
+
+[AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Interface, AllowMultiple = false, Inherited = true)]
+public class ConnectionAttribute : Attribute
 {
-    [AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Interface, AllowMultiple = false, Inherited = true)]
-    public class ConnectionAttribute : Attribute
+    public ConnectionAttribute(string name)
     {
-        public ConnectionAttribute(string name)
-        {
-            Name = name;
-        }
+        Name = name;
+    }
 
-        public string Name
-        {
-            get;
-            private set;
-        }
+    public string Name
+    {
+        get;
+        private set;
+    }
 
-        public string DatabaseName
-        {
-            get;
-            set;
-        }
+    public string DatabaseName
+    {
+        get;
+        set;
+    }
 
-        public string SchemaName
-        {
-            get;
-            set;
-        }
+    public string SchemaName
+    {
+        get;
+        set;
     }
 }

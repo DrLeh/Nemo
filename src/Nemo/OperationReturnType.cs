@@ -3,15 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo
+namespace Nemo;
+
+public enum OperationReturnType : byte
 {
-    public enum OperationReturnType : byte
-    {
-        Guess, 
-        NonQuery, 
-        MultiResult, 
-        SingleResult, 
-        SingleRow, 
-        Scalar
-    }
+    Guess, 
+    NonQuery, 
+    MultiResult, 
+    SingleResult, 
+    SingleRow, 
+    Scalar
 }

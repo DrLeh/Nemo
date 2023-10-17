@@ -3,15 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo.Attributes
+namespace Nemo.Attributes;
+
+[AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
+public class DistinctAttribute : Attribute
 {
-    [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
-    public class DistinctAttribute : Attribute
+    public Type EqualityComparerType
     {
-        public Type EqualityComparerType
-        {
-            get;
-            set;
-        }
+        get;
+        set;
     }
 }

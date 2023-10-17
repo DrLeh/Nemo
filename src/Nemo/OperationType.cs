@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo
+namespace Nemo;
+
+public enum OperationType
 {
-    public enum OperationType
-    {
-        Guess, 
-        StoredProcedure, 
-        Sql
-    }
+    Guess, 
+    StoredProcedure, 
+    Sql
 }

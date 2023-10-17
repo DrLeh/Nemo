@@ -8,27 +8,26 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace NemoTest
-{
-    class Program
-    {
-        private static IHostBuilder CreateHostBuilder(string[] args)
-        {
-            return Host.CreateDefaultBuilder(args)
-            .ConfigureAppConfiguration((hostingContext, configuration) =>
-            {
-                configuration.Sources.Clear();
-                configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
-            }).ConfigureServices(services =>
-            {
-                services.AddHostedService<TestService>();
-            });
-        }
+namespace NemoTest;
 
-        static async Task Main(string[] args)
+class Program
+{
+    private static IHostBuilder CreateHostBuilder(string[] args)
+    {
+        return Host.CreateDefaultBuilder(args)
+        .ConfigureAppConfiguration((hostingContext, configuration) =>
         {
-            var host = CreateHostBuilder(args).Build();
-            await host.RunAsync();
-        }
+            configuration.Sources.Clear();
+            configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
+        }).ConfigureServices(services =>
+        {
+            services.AddHostedService<TestService>();
+        });
+    }
+
+    static async Task Main(string[] args)
+    {
+        var host = CreateHostBuilder(args).Build();
+        await host.RunAsync();
     }
 }

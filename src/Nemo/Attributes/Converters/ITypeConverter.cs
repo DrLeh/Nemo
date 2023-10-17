@@ -1,7 +1,7 @@
 using System;
 
-namespace Nemo.Attributes.Converters
-{
+namespace Nemo.Attributes.Converters;
+
 	/// <summary>Represents an type converter, able to convert a type to another and back.</summary>
 	/// <typeparam name="F"></typeparam>
 	/// <typeparam name="T"></typeparam>
@@ -23,4 +23,3 @@ namespace Nemo.Attributes.Converters
 		/// <returns></returns>
 		F ConvertBackward(T to);
 	}
-}

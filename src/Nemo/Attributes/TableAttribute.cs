@@ -3,32 +3,31 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo.Attributes
+namespace Nemo.Attributes;
+
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface, AllowMultiple = false, Inherited = true)]
+public class TableAttribute : Attribute
 {
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface, AllowMultiple = false, Inherited = true)]
-    public class TableAttribute : Attribute
+    public TableAttribute(string name)
     {
-        public TableAttribute(string name)
-        {
-            Name = name;
-        }
+        Name = name;
+    }
 
-        public string Name
-        {
-            get;
-            private set;
-        }
+    public string Name
+    {
+        get;
+        private set;
+    }
 
-        public string SchemaName
-        {
-            get;
-            set;
-        }
+    public string SchemaName
+    {
+        get;
+        set;
+    }
 
-        public string SoftDeleteColumn
-        {
-            get;
-            set;
-        }
+    public string SoftDeleteColumn
+    {
+        get;
+        set;
     }
 }

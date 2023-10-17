@@ -4,72 +4,71 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 
-namespace Nemo.Extensions
+namespace Nemo.Extensions;
+
+public static class ExceptionExtensions
 {
-    public static class ExceptionExtensions
+    private const string ExceptionPrepForRemotingMethodName = "PrepForRemoting";
+    private static readonly MethodInfo prepForRemoting = typeof(Exception).GetMethod("PrepForRemoting", BindingFlags.NonPublic | BindingFlags.Instance);
+
+    public static void ThrowIfNull<T>(this T value, string name)
+        where T : class
     {
-        private const string ExceptionPrepForRemotingMethodName = "PrepForRemoting";
-        private static readonly MethodInfo prepForRemoting = typeof(Exception).GetMethod("PrepForRemoting", BindingFlags.NonPublic | BindingFlags.Instance);
-
-        public static void ThrowIfNull<T>(this T value, string name)
-            where T : class
+        if (value == null)
         {
-            if (value == null)
+            throw new ArgumentNullException(name);
+        }
+    }
+
+    public static void ThrowIfNegative(this int value, string name)
+    {
+        if (value < 0)
+        {
+            throw new ArgumentOutOfRangeException(name);
+        }
+    }
+
+    public static void ThrowIfNonPositive(this int value, string name)
+    {
+        if (value <= 0)
+        {
+            throw new ArgumentOutOfRangeException(name);
+        }
+    }
+
+    public static bool IsCritical(this Exception exception)
+    {
+        return exception is AccessViolationException || exception is NullReferenceException || exception is StackOverflowException || exception is OutOfMemoryException || exception is ThreadAbortException;
+    }
+
+    public static Exception PrepareForRethrow(this Exception exception)
+    {
+        exception.ThrowIfNull("exception");
+        prepForRemoting.Invoke(exception, new object[0]);
+        return exception;
+    }
+
+    public static void Rethrow(this Exception exception)
+    {
+        throw exception.PrepareForRethrow();
+    }
+
+    public static IEnumerable<Exception> Traverse(this Exception exception)
+    {
+        while (true)
+        {
+            yield return exception;
+            if (exception.InnerException != null)
             {
-                throw new ArgumentNullException(name);
+                exception = exception.InnerException;
+                continue;
             }
+            break;
         }
+    }
 
-        public static void ThrowIfNegative(this int value, string name)
-        {
-            if (value < 0)
-            {
-                throw new ArgumentOutOfRangeException(name);
-            }
-        }
-
-        public static void ThrowIfNonPositive(this int value, string name)
-        {
-            if (value <= 0)
-            {
-                throw new ArgumentOutOfRangeException(name);
-            }
-        }
-
-        public static bool IsCritical(this Exception exception)
-        {
-            return exception is AccessViolationException || exception is NullReferenceException || exception is StackOverflowException || exception is OutOfMemoryException || exception is ThreadAbortException;
-        }
-
-        public static Exception PrepareForRethrow(this Exception exception)
-        {
-            exception.ThrowIfNull("exception");
-            prepForRemoting.Invoke(exception, new object[0]);
-            return exception;
-        }
-
-        public static void Rethrow(this Exception exception)
-        {
-            throw exception.PrepareForRethrow();
-        }
-
-        public static IEnumerable<Exception> Traverse(this Exception exception)
-        {
-            while (true)
-            {
-                yield return exception;
-                if (exception.InnerException != null)
-                {
-                    exception = exception.InnerException;
-                    continue;
-                }
-                break;
-            }
-        }
-
-        public static string Format(this Exception exception, string delimiter = "\r\n")
-        {
-            return exception.Traverse().Select(e => e.Message).ToDelimitedString(delimiter);
-        }
+    public static string Format(this Exception exception, string delimiter = "\r\n")
+    {
+        return exception.Traverse().Select(e => e.Message).ToDelimitedString(delimiter);
     }
 }

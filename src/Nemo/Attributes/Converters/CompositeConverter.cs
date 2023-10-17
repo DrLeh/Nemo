@@ -1,7 +1,7 @@
 using System;
 
-namespace Nemo.Attributes.Converters
-{
+namespace Nemo.Attributes.Converters;
+
 	/// <summary>Composite converter, allows to compound two converters together.</summary>
 	/// <typeparam name="C1"></typeparam>
 	/// <typeparam name="C2"></typeparam>
@@ -31,4 +31,3 @@ namespace Nemo.Attributes.Converters
 		}
 		#endregion
 	}
-}

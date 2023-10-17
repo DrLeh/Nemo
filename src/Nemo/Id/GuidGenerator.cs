@@ -3,21 +3,20 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo.Id
-{
-    public class GuidGenerator : IIdGenerator
-    {
-        public object Generate()
-        {
-            return Guid.NewGuid();
-        }
-    }
+namespace Nemo.Id;
 
-    public class GuidStringGenerator : IIdGenerator
+public class GuidGenerator : IIdGenerator
+{
+    public object Generate()
     {
-        public object Generate()
-        {
-            return Guid.NewGuid().ToString("N");
-        }
+        return Guid.NewGuid();
+    }
+}
+
+public class GuidStringGenerator : IIdGenerator
+{
+    public object Generate()
+    {
+        return Guid.NewGuid().ToString("N");
     }
 }

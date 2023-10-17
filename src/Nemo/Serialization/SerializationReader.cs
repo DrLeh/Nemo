@@ -22,786 +22,785 @@ using Nemo.Utilities;
  * 
  */
 
-namespace Nemo.Serialization
+namespace Nemo.Serialization;
+
+public class SerializationReader : IDisposable
 {
-    public class SerializationReader : IDisposable
+    private readonly bool _serializeAll;
+    private readonly bool _includePropertyNames;
+    private byte? _objectByte;
+    private readonly Stream _stream;
+    private readonly Encoding _encoding;
+    private static readonly ConcurrentDictionary<string, Type> _types = new ConcurrentDictionary<string, Type>();
+    
+    public delegate object[] ObjectDeserializer(SerializationReader reader, int count);
+    private static readonly ConcurrentDictionary<Type, ObjectDeserializer> _deserializers = new ConcurrentDictionary<Type, ObjectDeserializer>();
+    private static readonly ConcurrentDictionary<Type, ObjectDeserializer> _deserializersNoHeader = new ConcurrentDictionary<Type, ObjectDeserializer>();
+    private static readonly ConcurrentDictionary<Type, ObjectDeserializer> _deserializersWithAllProperties = new ConcurrentDictionary<Type, ObjectDeserializer>();
+    private static readonly ConcurrentDictionary<Type, ObjectDeserializer> _deserializersWithAllPropertiesNoHeader = new ConcurrentDictionary<Type, ObjectDeserializer>();
+
+    private SerializationReader(Stream stream, Encoding encoding)
     {
-        private readonly bool _serializeAll;
-        private readonly bool _includePropertyNames;
-        private byte? _objectByte;
-        private readonly Stream _stream;
-        private readonly Encoding _encoding;
-        private static readonly ConcurrentDictionary<string, Type> _types = new ConcurrentDictionary<string, Type>();
-        
-        public delegate object[] ObjectDeserializer(SerializationReader reader, int count);
-        private static readonly ConcurrentDictionary<Type, ObjectDeserializer> _deserializers = new ConcurrentDictionary<Type, ObjectDeserializer>();
-        private static readonly ConcurrentDictionary<Type, ObjectDeserializer> _deserializersNoHeader = new ConcurrentDictionary<Type, ObjectDeserializer>();
-        private static readonly ConcurrentDictionary<Type, ObjectDeserializer> _deserializersWithAllProperties = new ConcurrentDictionary<Type, ObjectDeserializer>();
-        private static readonly ConcurrentDictionary<Type, ObjectDeserializer> _deserializersWithAllPropertiesNoHeader = new ConcurrentDictionary<Type, ObjectDeserializer>();
-
-        private SerializationReader(Stream stream, Encoding encoding)
+        _stream = stream;
+        _encoding = encoding ?? new UTF8Encoding();
+        var mode = (SerializationMode)ReadByte();
+        _serializeAll = (mode | SerializationMode.SerializeAll) == SerializationMode.SerializeAll;
+        _includePropertyNames = (mode | SerializationMode.IncludePropertyNames) == SerializationMode.IncludePropertyNames;
+        if (mode != SerializationMode.Manual)
         {
-            _stream = stream;
-            _encoding = encoding ?? new UTF8Encoding();
-            var mode = (SerializationMode)ReadByte();
-            _serializeAll = (mode | SerializationMode.SerializeAll) == SerializationMode.SerializeAll;
-            _includePropertyNames = (mode | SerializationMode.IncludePropertyNames) == SerializationMode.IncludePropertyNames;
-            if (mode != SerializationMode.Manual)
-            {
-                _objectByte = ReadByte();
-            }
+            _objectByte = ReadByte();
         }
+    }
 
-        private static int DecodeZigZag32(uint n)
-        {
-            return (int)(n >> 1) ^ -(int)(n & 1);
-        }
+    private static int DecodeZigZag32(uint n)
+    {
+        return (int)(n >> 1) ^ -(int)(n & 1);
+    }
 
-        private static long DecodeZigZag64(ulong n)
-        {
-            return (long)(n >> 1) ^ -(long)(n & 1);
-        }
+    private static long DecodeZigZag64(ulong n)
+    {
+        return (long)(n >> 1) ^ -(long)(n & 1);
+    }
 
-        private uint ReadFixed32()
-        {
-            var buffer = new byte[4];
-            _stream.Read(buffer, 0, 4);
-            var v = (uint)((int)buffer[0] | (int)buffer[1] << 8 | (int)buffer[2] << 16 | (int)buffer[3] << 24);
-            return v;
-        }
+    private uint ReadFixed32()
+    {
+        var buffer = new byte[4];
+        _stream.Read(buffer, 0, 4);
+        var v = (uint)((int)buffer[0] | (int)buffer[1] << 8 | (int)buffer[2] << 16 | (int)buffer[3] << 24);
+        return v;
+    }
 
-        private ulong ReadFixed64()
-        {
-            var buffer = new byte[8];
-            _stream.Read(buffer, 0, 8);
-            var v1 = (uint)((int)buffer[0] | (int)buffer[1] << 8 | (int)buffer[2] << 16 | (int)buffer[3] << 24);
-            var v2 = (uint)((int)buffer[4] | (int)buffer[5] << 8 | (int)buffer[6] << 16 | (int)buffer[7] << 24);
-            var v = (ulong)v2 << 32 | (ulong)v1;
-            return v;
-        }
+    private ulong ReadFixed64()
+    {
+        var buffer = new byte[8];
+        _stream.Read(buffer, 0, 8);
+        var v1 = (uint)((int)buffer[0] | (int)buffer[1] << 8 | (int)buffer[2] << 16 | (int)buffer[3] << 24);
+        var v2 = (uint)((int)buffer[4] | (int)buffer[5] << 8 | (int)buffer[6] << 16 | (int)buffer[7] << 24);
+        var v = (ulong)v2 << 32 | (ulong)v1;
+        return v;
+    }
 
-        public static SerializationReader CreateReader(SerializationInfo info)
-        {
-            byte[] buffer = (byte[])info.GetValue("X", typeof(byte[]));
-            return SerializationReader.CreateReader(buffer);
-        }
+    public static SerializationReader CreateReader(SerializationInfo info)
+    {
+        byte[] buffer = (byte[])info.GetValue("X", typeof(byte[]));
+        return SerializationReader.CreateReader(buffer);
+    }
 
-        public static SerializationReader CreateReader(byte[] buffer)
-        {
-            return new SerializationReader(new MemoryStream(buffer), null);
-        }
+    public static SerializationReader CreateReader(byte[] buffer)
+    {
+        return new SerializationReader(new MemoryStream(buffer), null);
+    }
 
-        public byte ReadByte()
-        {
-            return (byte)_stream.ReadByte();
-        }
+    public byte ReadByte()
+    {
+        return (byte)_stream.ReadByte();
+    }
 
-        public sbyte ReadSByte()
-        {
-            return (sbyte)_stream.ReadByte();
-        }
+    public sbyte ReadSByte()
+    {
+        return (sbyte)_stream.ReadByte();
+    }
 
-        public bool ReadBoolean()
+    public bool ReadBoolean()
+    {
+        var b = _stream.ReadByte();
+        return b != 0;
+    }
+
+    public char ReadChar()
+    {
+        return (char)ReadUInt32();
+    }
+
+    public short ReadInt16()
+    {
+        return (short)DecodeZigZag32(ReadUInt32());
+    }
+
+    public int ReadInt32()
+    {
+        return DecodeZigZag32(ReadUInt32());
+    }
+
+    public long ReadInt64()
+    {
+        return DecodeZigZag64(ReadUInt64());
+    }
+
+    public ushort ReadUInt16()
+    {
+        return (ushort)ReadUInt32();
+    }
+
+    public uint ReadUInt32()
+    {
+        int result = 0;
+        int offset = 0;
+
+        for (; offset < 32; offset += 7)
         {
             var b = _stream.ReadByte();
-            return b != 0;
-        }
-
-        public char ReadChar()
-        {
-            return (char)ReadUInt32();
-        }
-
-        public short ReadInt16()
-        {
-            return (short)DecodeZigZag32(ReadUInt32());
-        }
-
-        public int ReadInt32()
-        {
-            return DecodeZigZag32(ReadUInt32());
-        }
-
-        public long ReadInt64()
-        {
-            return DecodeZigZag64(ReadUInt64());
-        }
-
-        public ushort ReadUInt16()
-        {
-            return (ushort)ReadUInt32();
-        }
-
-        public uint ReadUInt32()
-        {
-            int result = 0;
-            int offset = 0;
-
-            for (; offset < 32; offset += 7)
+            if (b == -1)
             {
-                var b = _stream.ReadByte();
-                if (b == -1)
-                {
-                    throw new EndOfStreamException();
-                }
-
-                result |= (b & 0x7f) << offset;
-
-                if ((b & 0x80) == 0)
-                {
-                    return (uint)result;
-                }
+                throw new EndOfStreamException();
             }
 
-            throw new InvalidDataException();
+            result |= (b & 0x7f) << offset;
+
+            if ((b & 0x80) == 0)
+            {
+                return (uint)result;
+            }
         }
 
-        public ulong ReadUInt64()
+        throw new InvalidDataException();
+    }
+
+    public ulong ReadUInt64()
+    {
+        long result = 0;
+        int offset = 0;
+
+        for (; offset < 64; offset += 7)
         {
-            long result = 0;
-            int offset = 0;
-
-            for (; offset < 64; offset += 7)
+            var b = _stream.ReadByte();
+            if (b == -1)
             {
-                var b = _stream.ReadByte();
-                if (b == -1)
-                {
-                    throw new EndOfStreamException();
-                }
-
-                result |= ((long)(b & 0x7f)) << offset;
-
-                if ((b & 0x80) == 0)
-                {
-                    return (ulong)result;
-                }
+                throw new EndOfStreamException();
             }
 
-            throw new InvalidDataException();
+            result |= ((long)(b & 0x7f)) << offset;
+
+            if ((b & 0x80) == 0)
+            {
+                return (ulong)result;
+            }
         }
 
-        public unsafe float ReadSingle()
-        {
-            var v = ReadFixed32();
-            return *(float*)(&v);
-        }
+        throw new InvalidDataException();
+    }
 
-        public unsafe double ReadDouble()
-        {
-            var v = ReadFixed64();
-            return *(double*)(&v);
-        }
+    public unsafe float ReadSingle()
+    {
+        var v = ReadFixed32();
+        return *(float*)(&v);
+    }
 
-        public decimal ReadDecimal()
-        {
-            var bits = new int[4];
-            bits[0] = ReadInt32();
-            bits[1] = ReadInt32();
-            bits[2] = ReadInt32();
-            bits[3] = ReadInt32();
-            return new decimal(bits);
-        }
+    public unsafe double ReadDouble()
+    {
+        var v = ReadFixed64();
+        return *(double*)(&v);
+    }
 
-        public byte[] ReadBytes()
-        {
-            var length = ReadUInt32();
-            
-            if (length == 0)
-            {
-                return null;
-            }
+    public decimal ReadDecimal()
+    {
+        var bits = new int[4];
+        bits[0] = ReadInt32();
+        bits[1] = ReadInt32();
+        bits[2] = ReadInt32();
+        bits[3] = ReadInt32();
+        return new decimal(bits);
+    }
 
-            if (length == 1)
-            {
-                return new byte[0];
-            }
-
-            length -= 1;
-            var buffer = new byte[length];
-            int l = 0;
-            while (l < length)
-            {
-                int r = _stream.Read(buffer, l, (int)length - l);
-                if (r == 0)
-                {
-                    throw new EndOfStreamException();
-                }
-                l += r;
-            }
-            return buffer;
-        }
-
-        public char[] ReadChars()
-        {
-            var length = ReadUInt32();
-            if (length == 0)
-            {
-                return null;
-            }
-
-            if (length == 1)
-            {
-                return new char[0];
-            }
-
-            length -= 1;
-            var buffer = new char[length];
-            for (int i = 0; i < length; i++)
-            {
-                buffer[i] = ReadChar();
-            }
-            return buffer;
-        }
-
-        public string ReadString()
-        {
-            var length = ReadUInt32();
-            if (length == 0)
-            {
-                return null;
-            }
-
-            if (length == 1)
-            {
-                return string.Empty;
-            }
-
-            length -= 1;
-            var buffer = new byte[length];
-            int l = 0;
-            while (l < length)
-            {
-                int r = _stream.Read(buffer, l, (int)length - l);
-                if (r == 0)
-                {
-                    throw new EndOfStreamException();
-                }
-                l += r;
-            }
-            return _encoding.GetString(buffer);
-        }
-
-        public DateTime ReadDateTime()
-        {
-            var ticks = ReadTicks();
-            if (ticks == long.MinValue) return DateTime.MinValue;
-            if (ticks == long.MaxValue) return DateTime.MaxValue;
-            return UnixDateTime.Epoch.AddTicks(ticks);
-        }
+    public byte[] ReadBytes()
+    {
+        var length = ReadUInt32();
         
-        public TimeSpan ReadTimeSpan()
+        if (length == 0)
         {
-            var ticks = ReadTicks();
-            if (ticks == long.MinValue) return TimeSpan.MinValue;
-            if (ticks == long.MaxValue) return TimeSpan.MaxValue;
-            return TimeSpan.FromTicks(ticks);
+            return null;
         }
 
-        private long ReadTicks()
+        if (length == 1)
         {
-            var scale = (TemporalScale)ReadByte();
-            var ticks = ReadInt64();
+            return new byte[0];
+        }
 
-            switch (scale)
+        length -= 1;
+        var buffer = new byte[length];
+        int l = 0;
+        while (l < length)
+        {
+            int r = _stream.Read(buffer, l, (int)length - l);
+            if (r == 0)
             {
-                case TemporalScale.Days:
-                    ticks *= TimeSpan.TicksPerDay;
-                    break;
-                case TemporalScale.Hours:
-                    ticks *= TimeSpan.TicksPerHour;
-                    break;
-                case TemporalScale.Minutes:
-                    ticks *= TimeSpan.TicksPerMinute;
-                    break;
-                case TemporalScale.Seconds:
-                    ticks *= TimeSpan.TicksPerSecond;
-                    break;
-                case TemporalScale.Milliseconds:
-                    ticks *= TimeSpan.TicksPerMillisecond;
-                    break;
-                case TemporalScale.Ticks:
-                    break;
-                case TemporalScale.MinMax:
-                    switch (ticks)
-                    {
-                        case 1: return long.MaxValue;
-                        case -1: return long.MinValue;
-                    }
-                    break;
+                throw new EndOfStreamException();
             }
-            return ticks;
+            l += r;
+        }
+        return buffer;
+    }
+
+    public char[] ReadChars()
+    {
+        var length = ReadUInt32();
+        if (length == 0)
+        {
+            return null;
         }
 
-        public DateTimeOffset ReadDateTimeOffset()
+        if (length == 1)
         {
-            return new DateTimeOffset(ReadDateTime(), ReadTimeSpan());
+            return new char[0];
         }
 
-        public Guid ReadGuid()
+        length -= 1;
+        var buffer = new char[length];
+        for (int i = 0; i < length; i++)
         {
-            return new Guid(ReadBytes());
+            buffer[i] = ReadChar();
+        }
+        return buffer;
+    }
+
+    public string ReadString()
+    {
+        var length = ReadUInt32();
+        if (length == 0)
+        {
+            return null;
         }
 
-        public Version ReadVersion()
+        if (length == 1)
         {
-            var major = (int)ReadUInt32();
-            var minor = (int)ReadUInt32();
-            var build = (int)ReadUInt32();
-            var revision = (int)ReadUInt32();
-            return new Version(major, minor, build, revision);
+            return string.Empty;
         }
 
-        public Uri ReadUri()
+        length -= 1;
+        var buffer = new byte[length];
+        int l = 0;
+        while (l < length)
         {
-            var absoluteUri = ReadString();
-            return new Uri(absoluteUri);
-        }
-
-        public IList<T> ReadList<T>()
-        {
-            var count = ReadUInt32();
-            if (count == 0)
+            int r = _stream.Read(buffer, l, (int)length - l);
+            if (r == 0)
             {
-                return null;
+                throw new EndOfStreamException();
             }
-            else if (count == 1)
-            {
-                return new List<T>();
-            }
-            else
-            {
-                IList<T> list = new List<T>();
-                for (int i = 0; i < count - 1; i++)
+            l += r;
+        }
+        return _encoding.GetString(buffer);
+    }
+
+    public DateTime ReadDateTime()
+    {
+        var ticks = ReadTicks();
+        if (ticks == long.MinValue) return DateTime.MinValue;
+        if (ticks == long.MaxValue) return DateTime.MaxValue;
+        return UnixDateTime.Epoch.AddTicks(ticks);
+    }
+    
+    public TimeSpan ReadTimeSpan()
+    {
+        var ticks = ReadTicks();
+        if (ticks == long.MinValue) return TimeSpan.MinValue;
+        if (ticks == long.MaxValue) return TimeSpan.MaxValue;
+        return TimeSpan.FromTicks(ticks);
+    }
+
+    private long ReadTicks()
+    {
+        var scale = (TemporalScale)ReadByte();
+        var ticks = ReadInt64();
+
+        switch (scale)
+        {
+            case TemporalScale.Days:
+                ticks *= TimeSpan.TicksPerDay;
+                break;
+            case TemporalScale.Hours:
+                ticks *= TimeSpan.TicksPerHour;
+                break;
+            case TemporalScale.Minutes:
+                ticks *= TimeSpan.TicksPerMinute;
+                break;
+            case TemporalScale.Seconds:
+                ticks *= TimeSpan.TicksPerSecond;
+                break;
+            case TemporalScale.Milliseconds:
+                ticks *= TimeSpan.TicksPerMillisecond;
+                break;
+            case TemporalScale.Ticks:
+                break;
+            case TemporalScale.MinMax:
+                switch (ticks)
                 {
-                    list.Add((T)ReadObject(typeof(T)));
+                    case 1: return long.MaxValue;
+                    case -1: return long.MinValue;
                 }
-                return list;
-            }
+                break;
         }
+        return ticks;
+    }
 
-        public void ReadList(IList list, Type elementType)
+    public DateTimeOffset ReadDateTimeOffset()
+    {
+        return new DateTimeOffset(ReadDateTime(), ReadTimeSpan());
+    }
+
+    public Guid ReadGuid()
+    {
+        return new Guid(ReadBytes());
+    }
+
+    public Version ReadVersion()
+    {
+        var major = (int)ReadUInt32();
+        var minor = (int)ReadUInt32();
+        var build = (int)ReadUInt32();
+        var revision = (int)ReadUInt32();
+        return new Version(major, minor, build, revision);
+    }
+
+    public Uri ReadUri()
+    {
+        var absoluteUri = ReadString();
+        return new Uri(absoluteUri);
+    }
+
+    public IList<T> ReadList<T>()
+    {
+        var count = ReadUInt32();
+        if (count == 0)
         {
-            var count = ReadUInt32();
-            if (count == 0 || count == 1)
-            {
-                return;
-            }
-            else
-            {
-                for (int i = 0; i < count - 1; i++)
-                {
-                    list.Add(ReadObject(elementType));
-                }
-            }
+            return null;
         }
-
-        public IDictionary<TKey, TValue> ReadDictionary<TKey, TValue>()
+        else if (count == 1)
         {
-            var count = ReadUInt32();
-            if (count == 0)
-            {
-                return null;
-            }
-            else if (count == 1)
-            {
-                return new Dictionary<TKey, TValue>();
-            }
-            else
-            {
-                var map = new Dictionary<TKey, TValue>();
-                for (int i = 0; i < count - 1; i++)
-                {
-                    map.Add((TKey)ReadObject(typeof(TKey)), (TValue)ReadObject(typeof(TValue)));
-                }
-                return map;
-            }
+            return new List<T>();
         }
-
-        public void ReadDictionary(IDictionary map, Type keyType, Type valueType)
+        else
         {
-            var count = ReadUInt32();
-            if (count == 0 || count == 1)
-            {
-                return;
-            }
+            IList<T> list = new List<T>();
             for (int i = 0; i < count - 1; i++)
             {
-                map.Add(ReadObject(keyType), ReadObject(valueType));
+                list.Add((T)ReadObject(typeof(T)));
+            }
+            return list;
+        }
+    }
+
+    public void ReadList(IList list, Type elementType)
+    {
+        var count = ReadUInt32();
+        if (count == 0 || count == 1)
+        {
+            return;
+        }
+        else
+        {
+            for (int i = 0; i < count - 1; i++)
+            {
+                list.Add(ReadObject(elementType));
             }
         }
+    }
 
-        private static Type GetType(string typeName)
+    public IDictionary<TKey, TValue> ReadDictionary<TKey, TValue>()
+    {
+        var count = ReadUInt32();
+        if (count == 0)
         {
-            if (string.IsNullOrEmpty(typeName))
+            return null;
+        }
+        else if (count == 1)
+        {
+            return new Dictionary<TKey, TValue>();
+        }
+        else
+        {
+            var map = new Dictionary<TKey, TValue>();
+            for (int i = 0; i < count - 1; i++)
             {
-                return null;
+                map.Add((TKey)ReadObject(typeof(TKey)), (TValue)ReadObject(typeof(TValue)));
             }
-            Type type = _types.GetOrAdd(typeName, k => typeName.IndexOf(',') > -1 ? Type.GetType(typeName) : AppDomain.CurrentDomain.GetAssemblies().SelectMany(a => a.GetTypes()).FirstOrDefault(t => t.FullName == typeName));
-            return type;
+            return map;
+        }
+    }
+
+    public void ReadDictionary(IDictionary map, Type keyType, Type valueType)
+    {
+        var count = ReadUInt32();
+        if (count == 0 || count == 1)
+        {
+            return;
+        }
+        for (int i = 0; i < count - 1; i++)
+        {
+            map.Add(ReadObject(keyType), ReadObject(valueType));
+        }
+    }
+
+    private static Type GetType(string typeName)
+    {
+        if (string.IsNullOrEmpty(typeName))
+        {
+            return null;
+        }
+        Type type = _types.GetOrAdd(typeName, k => typeName.IndexOf(',') > -1 ? Type.GetType(typeName) : AppDomain.CurrentDomain.GetAssemblies().SelectMany(a => a.GetTypes()).FirstOrDefault(t => t.FullName == typeName));
+        return type;
+    }
+
+    private void Skip(int count)
+    {
+        var buffer = new byte[count];
+        _stream.Read(buffer, 0, count);
+    }
+    
+    public object ReadObject(Type objectType)
+    {
+        return ReadObject(objectType, _objectByte.HasValue ? (ObjectTypeCode)_objectByte.Value : Reflector.GetObjectTypeCode(objectType), typeof(IConvertible).IsAssignableFrom(objectType));
+    }
+
+    public object ReadObject(Type objectType, ObjectTypeCode expectedTypeCode, bool isConvertible)
+    {
+        ObjectTypeCode typeCode;
+        if (_objectByte.HasValue)
+        {
+            typeCode = (ObjectTypeCode)_objectByte.Value;
+            _objectByte = null;
+        }
+        else
+        {
+            typeCode = (ObjectTypeCode)ReadByte();
         }
 
-        private void Skip(int count)
+        switch (typeCode)
         {
-            var buffer = new byte[count];
-            _stream.Read(buffer, 0, count);
-        }
-        
-        public object ReadObject(Type objectType)
-        {
-            return ReadObject(objectType, _objectByte.HasValue ? (ObjectTypeCode)_objectByte.Value : Reflector.GetObjectTypeCode(objectType), typeof(IConvertible).IsAssignableFrom(objectType));
-        }
-
-        public object ReadObject(Type objectType, ObjectTypeCode expectedTypeCode, bool isConvertible)
-        {
-            ObjectTypeCode typeCode;
-            if (_objectByte.HasValue)
-            {
-                typeCode = (ObjectTypeCode)_objectByte.Value;
-                _objectByte = null;
-            }
-            else
-            {
-                typeCode = (ObjectTypeCode)ReadByte();
-            }
-
-            switch (typeCode)
-            {
-                case ObjectTypeCode.Boolean:
-                    return ConvertIfNecessary(ReadBoolean(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.Byte:
-                    return ConvertIfNecessary(ReadByte(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.UInt16:
-                    return ConvertIfNecessary(ReadUInt16(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.UInt32:
-                    return ConvertIfNecessary(ReadUInt32(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.UInt64:
-                    return ConvertIfNecessary(ReadUInt64(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.SByte:
-                    return ConvertIfNecessary(ReadSByte(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.Int16:
-                    return ConvertIfNecessary(ReadInt16(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.Int32:
-                    return ConvertIfNecessary(ReadInt32(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.Int64:
-                    return ConvertIfNecessary(ReadInt64(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.Char:
-                    return ConvertIfNecessary(ReadChar(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.String:
-                    return ConvertIfNecessary(ReadString(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.Single:
-                    return ConvertIfNecessary(ReadSingle(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.Double:
-                    return ConvertIfNecessary(ReadDouble(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.Decimal:
-                    return ConvertIfNecessary(ReadDecimal(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.DateTime:
-                    return ConvertIfNecessary(ReadDateTime(), objectType, typeCode, expectedTypeCode, isConvertible);
-                case ObjectTypeCode.ByteArray:
-                    return ReadBytes();
-                case ObjectTypeCode.CharArray:
-                    return ReadChars();
-                case ObjectTypeCode.TimeSpan:
-                    return ReadTimeSpan();
-                case ObjectTypeCode.DateTimeOffset:
-                    return ReadDateTimeOffset();
-                case ObjectTypeCode.Guid:
-                    return ReadGuid();
-                case ObjectTypeCode.Version:
-                    return ReadVersion();
-                case ObjectTypeCode.Uri:
-                    return ReadUri();
-                case ObjectTypeCode.DBNull:
-                    return DBNull.Value;
-                case ObjectTypeCode.SimpleList:
+            case ObjectTypeCode.Boolean:
+                return ConvertIfNecessary(ReadBoolean(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.Byte:
+                return ConvertIfNecessary(ReadByte(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.UInt16:
+                return ConvertIfNecessary(ReadUInt16(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.UInt32:
+                return ConvertIfNecessary(ReadUInt32(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.UInt64:
+                return ConvertIfNecessary(ReadUInt64(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.SByte:
+                return ConvertIfNecessary(ReadSByte(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.Int16:
+                return ConvertIfNecessary(ReadInt16(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.Int32:
+                return ConvertIfNecessary(ReadInt32(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.Int64:
+                return ConvertIfNecessary(ReadInt64(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.Char:
+                return ConvertIfNecessary(ReadChar(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.String:
+                return ConvertIfNecessary(ReadString(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.Single:
+                return ConvertIfNecessary(ReadSingle(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.Double:
+                return ConvertIfNecessary(ReadDouble(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.Decimal:
+                return ConvertIfNecessary(ReadDecimal(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.DateTime:
+                return ConvertIfNecessary(ReadDateTime(), objectType, typeCode, expectedTypeCode, isConvertible);
+            case ObjectTypeCode.ByteArray:
+                return ReadBytes();
+            case ObjectTypeCode.CharArray:
+                return ReadChars();
+            case ObjectTypeCode.TimeSpan:
+                return ReadTimeSpan();
+            case ObjectTypeCode.DateTimeOffset:
+                return ReadDateTimeOffset();
+            case ObjectTypeCode.Guid:
+                return ReadGuid();
+            case ObjectTypeCode.Version:
+                return ReadVersion();
+            case ObjectTypeCode.Uri:
+                return ReadUri();
+            case ObjectTypeCode.DBNull:
+                return DBNull.Value;
+            case ObjectTypeCode.SimpleList:
+                {
+                    var objectList = (IList)objectType.New();
+                    ReadList(objectList, objectType.GetGenericArguments()[0]);
+                    return objectList;
+                }
+            case ObjectTypeCode.ObjectMap:
+                {
+                    var objectMap = (IDictionary)objectType.New();
+                    var genericArgs = objectType.GetGenericArguments();
+                    ReadDictionary(objectMap, genericArgs[0], genericArgs[1]);
+                    return objectMap;
+                }
+            case ObjectTypeCode.Object:
+                {
+                    var deserializer = CreateDelegate(objectType);
+                    var dataEntities = deserializer(this, 1);
+                    if (dataEntities != null && dataEntities.Length > 0)
                     {
-                        var objectList = (IList)objectType.New();
-                        ReadList(objectList, objectType.GetGenericArguments()[0]);
-                        return objectList;
+                        return dataEntities[0];
                     }
-                case ObjectTypeCode.ObjectMap:
+                    return null;
+                }
+            case ObjectTypeCode.ObjectList:
+            case ObjectTypeCode.PolymorphicObjectList:
+                {
+                    var itemCount = (int)ReadUInt32();
+
+                    var listAspectType = (ListAspectType)ReadByte();
+                    DistinctAttribute distinctAttribute = null;
+                    SortedAttribute sortedAttribute = null;
+                    if (listAspectType != ListAspectType.None)
                     {
-                        var objectMap = (IDictionary)objectType.New();
-                        var genericArgs = objectType.GetGenericArguments();
-                        ReadDictionary(objectMap, genericArgs[0], genericArgs[1]);
-                        return objectMap;
+                        var comparerType = GetType(ReadString());
+                        switch (listAspectType)
+                        {
+                            case ListAspectType.Distinct:
+                                distinctAttribute = new DistinctAttribute { EqualityComparerType = comparerType };
+                                break;
+                            case (ListAspectType.Sorted | ListAspectType.Distinct):
+                            case ListAspectType.Sorted:
+                                sortedAttribute = new SortedAttribute { ComparerType = comparerType };
+                                if (listAspectType != ListAspectType.Sorted)
+                                {
+                                    distinctAttribute = new DistinctAttribute();
+                                }
+                                break;
+                        }
                     }
-                case ObjectTypeCode.Object:
+
+                    var list = List.Create(objectType, distinctAttribute, sortedAttribute);
+
+                    if (typeCode == ObjectTypeCode.PolymorphicObjectList)
+                    {
+                        var elementTypes = ReadList<string>().Select(t => Type.GetType(t, false)).ToArray();
+
+                        for (var i = 0; i < itemCount; i++)
+                        {
+                            var pos = ReadInt32();
+
+                            var dataEntity = ReadObject(elementTypes[pos], ObjectTypeCode.Object, false);
+                            list.Add(dataEntity);
+                        }
+                    }
+                    else
                     {
                         var deserializer = CreateDelegate(objectType);
-                        var dataEntities = deserializer(this, 1);
-                        if (dataEntities != null && dataEntities.Length > 0)
+                        var dataEntities = deserializer(this, itemCount);
+                        for (var i = 0; i < dataEntities.Length; i++)
                         {
-                            return dataEntities[0];
+                            list.Add(dataEntities[i]);
                         }
-                        return null;
                     }
-                case ObjectTypeCode.ObjectList:
-                case ObjectTypeCode.PolymorphicObjectList:
-                    {
-                        var itemCount = (int)ReadUInt32();
-
-                        var listAspectType = (ListAspectType)ReadByte();
-                        DistinctAttribute distinctAttribute = null;
-                        SortedAttribute sortedAttribute = null;
-                        if (listAspectType != ListAspectType.None)
-                        {
-                            var comparerType = GetType(ReadString());
-                            switch (listAspectType)
-                            {
-                                case ListAspectType.Distinct:
-                                    distinctAttribute = new DistinctAttribute { EqualityComparerType = comparerType };
-                                    break;
-                                case (ListAspectType.Sorted | ListAspectType.Distinct):
-                                case ListAspectType.Sorted:
-                                    sortedAttribute = new SortedAttribute { ComparerType = comparerType };
-                                    if (listAspectType != ListAspectType.Sorted)
-                                    {
-                                        distinctAttribute = new DistinctAttribute();
-                                    }
-                                    break;
-                            }
-                        }
-
-                        var list = List.Create(objectType, distinctAttribute, sortedAttribute);
-
-                        if (typeCode == ObjectTypeCode.PolymorphicObjectList)
-                        {
-                            var elementTypes = ReadList<string>().Select(t => Type.GetType(t, false)).ToArray();
-
-                            for (var i = 0; i < itemCount; i++)
-                            {
-                                var pos = ReadInt32();
-
-                                var dataEntity = ReadObject(elementTypes[pos], ObjectTypeCode.Object, false);
-                                list.Add(dataEntity);
-                            }
-                        }
-                        else
-                        {
-                            var deserializer = CreateDelegate(objectType);
-                            var dataEntities = deserializer(this, itemCount);
-                            for (var i = 0; i < dataEntities.Length; i++)
-                            {
-                                list.Add(dataEntities[i]);
-                            }
-                        }
-                        return list;
-                    }
-                default:
-                    return null;
-            }
-        }
-
-        /// <summary>
-        /// Reads data from a stream until the end is reached. The
-        /// data is returned as a byte array. An IOException is
-        /// thrown if any of the underlying IO calls fail.
-        /// </summary>
-        /// <param name="stream">The stream to read data from</param>
-        /// <param name="initialLength">The initial buffer length</param>
-        public static byte[] ReadStream(Stream stream, int initialLength)
-        {
-            // If we've been passed an unhelpful initial length, just
-            // use 32K.
-            if (initialLength < 1)
-            {
-                initialLength = 32768;
-            }
-
-            var buffer = new byte[initialLength];
-            int read = 0;
-
-            int chunk;
-            while ((chunk = stream.Read(buffer, read, buffer.Length - read)) > 0)
-            {
-                read += chunk;
-
-                // If we've reached the end of our buffer, check to see if there's
-                // any more information
-                if (read == buffer.Length)
-                {
-                    int nextByte = stream.ReadByte();
-
-                    // End of stream? If so, we're done
-                    if (nextByte == -1)
-                    {
-                        return buffer;
-                    }
-
-                    // Nope. Resize the buffer, put in the byte we've just
-                    // read, and continue
-                    var newBuffer = new byte[buffer.Length * 2];
-                    Buffer.BlockCopy(buffer, 0, newBuffer, 0, buffer.Length);
-                    newBuffer[read] = (byte)nextByte;
-                    buffer = newBuffer;
-                    read++;
+                    return list;
                 }
-            }
-            // Buffer is now too big. Shrink it.
-            var result = new byte[read];
-            Buffer.BlockCopy(buffer, 0, result, 0, read);
-            return result;
+            default:
+                return null;
         }
-
-        public static byte[] ReadStream(Stream stream)
-        {
-            return ReadStream(stream, -1);
-        }
-
-        public static object ReadObjectWithType(byte[] buffer)
-        {
-            var typeLength = BitConverter.ToInt32(buffer.Slice(0, 4), 0);
-            var typeName = Encoding.UTF8.GetString(buffer.Slice(4, typeLength));
-            var reader = CreateReader(buffer.Slice(4 + typeLength, buffer.Length - 1));
-            var result = reader.ReadObject(GetType(typeName));
-            return result;
-        }
-
-        private static object ConvertIfNecessary(object value, Type objectType, ObjectTypeCode typeCode, ObjectTypeCode expectedTypeCode, bool isConvertible)
-        {
-            if (expectedTypeCode != typeCode && isConvertible)
-            {
-                return Reflector.ChangeType(value, objectType);
-            }
-            return value;
-        }
-
-        private ObjectDeserializer CreateDelegate(Type objectType)
-        {
-            var exists = true;
-            var propertyCount = -1; 
-            var propertyLength = -1;
-            if (_includePropertyNames)
-            {
-                propertyCount = (int)ReadUInt32();
-                propertyLength = (int)ReadUInt32();
-            }
-            ObjectDeserializer deserializer;
-            if (!_serializeAll)
-            {
-                deserializer = _includePropertyNames ? _deserializers.GetOrAdd(objectType, t => CreateDeserializer(t, propertyCount, ref exists)) : _deserializersNoHeader.GetOrAdd(objectType, t => CreateDeserializer(t, propertyCount, ref exists));
-            }
-            else
-            {
-                deserializer = _includePropertyNames ? _deserializersWithAllProperties.GetOrAdd(objectType, t => CreateDeserializer(t, propertyCount, ref exists)) : _deserializersWithAllPropertiesNoHeader.GetOrAdd(objectType, t => CreateDeserializer(t, propertyCount, ref exists));
-            }
-            if (exists && _includePropertyNames)
-            {
-                Skip(propertyLength);
-            }
-            return deserializer;
-        }
-
-        private ObjectDeserializer CreateDeserializer(Type objectType, int propertyCount, ref bool exists)
-        {
-            var dataEntityType = objectType.IsInterface ? ObjectFactory.Create(objectType).GetType() : objectType;
-            var propertyNames = new List<string>();
-            if (_includePropertyNames)
-            {
-                for (var i = 0; i < propertyCount; i++)
-                {
-                    propertyNames.Add(ReadString());
-                }
-            }
-            exists = false;
-            return GenerateDelegate(dataEntityType, propertyNames);
-        }
-
-        private ObjectDeserializer GenerateDelegate(Type objectType, List<string> propertyNames)
-        {
-            var method = new DynamicMethod("Deserialize_" + objectType.Name, typeof(object[]), new[] { typeof(SerializationReader), typeof(int) }, typeof(SerializationReader).Module);
-            var il = method.GetILGenerator();
-
-            var readObject = GetType().GetMethod("ReadObject", new[] { typeof(Type), typeof(ObjectTypeCode), typeof(bool) });
-            var getTypeFromHandle = typeof(Type).GetMethod("GetTypeFromHandle");
-
-            var interfaceType = objectType;
-            if (Reflector.IsEmitted(objectType))
-            {
-                interfaceType = Reflector.GetInterface(objectType) ?? objectType;
-            }
-
-            var properties = Reflector.GetAllProperties(interfaceType);
-            PropertyInfo[] orderedProperties;
-            if(_includePropertyNames)
-            {
-                orderedProperties = properties.Where(p => propertyNames.Contains(p.Name)).Arrange(propertyNames, p => p.Name).ToArray();
-            }
-            else
-            {
-                var propertyPositions = Reflector.GetAllPropertyPositions(interfaceType).OrderBy(p => p.Value).Select(p => p.Key);
-                orderedProperties = properties.Where(p => p.CanRead && p.CanWrite && p.Name != "Indexer" && (_serializeAll || !p.GetCustomAttributes(typeof(DoNotSerializeAttribute), false).Any())).Arrange(propertyPositions, p => p.Name).ToArray();
-            }
-
-            var enterLoop = il.DefineLabel();
-            var exitLoop = il.DefineLabel();
-            var result = il.DeclareLocal(typeof(object[]));
-            var index = il.DeclareLocal(typeof(int));
-            var value = il.DeclareLocal(interfaceType);
-
-            // Instanciate result array
-            il.Emit(OpCodes.Ldarg_1);
-            il.Emit(OpCodes.Newarr, typeof(object));
-            il.Emit(OpCodes.Stloc_0);
-
-            // Set-up loop
-            il.Emit(OpCodes.Ldc_I4_0);
-            il.Emit(OpCodes.Stloc_1);
-            il.Emit(OpCodes.Br, exitLoop);
-            il.MarkLabel(enterLoop);
-
-            // Create instance of a given type
-            il.Emit(OpCodes.Newobj, objectType.GetConstructor(Type.EmptyTypes));
-            il.Emit(OpCodes.Stloc_2);
-
-            foreach (var property in orderedProperties)
-            {
-                // Read property value
-                il.Emit(OpCodes.Ldloc_2);
-                il.Emit(OpCodes.Ldarg_0);
-                Type propertyType;
-                if (!Reflector.IsDataEntityList(property.PropertyType, out propertyType))
-                {
-                    propertyType = property.PropertyType;
-                }
-                il.Emit(OpCodes.Ldtoken, propertyType);
-                il.Emit(OpCodes.Call, getTypeFromHandle);
-                il.Emit(OpCodes.Ldc_I4, (int)Reflector.GetObjectTypeCode(propertyType));
-                il.Emit(typeof(IConvertible).IsAssignableFrom(propertyType) ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
-                il.Emit(OpCodes.Callvirt, readObject);
-                il.EmitCastToReference(property.PropertyType);
-                il.EmitCall(OpCodes.Callvirt, property.GetSetMethod(), null);
-            }
-
-            // Set array's element
-            il.Emit(OpCodes.Ldloc_0);
-            il.Emit(OpCodes.Ldloc_1);
-            il.Emit(OpCodes.Ldloc_2);
-            il.Emit(OpCodes.Stelem_Ref);
-
-            il.Emit(OpCodes.Ldloc_1);
-            il.Emit(OpCodes.Ldc_I4_1);
-            il.Emit(OpCodes.Add);
-            il.Emit(OpCodes.Stloc_1);
-            il.MarkLabel(exitLoop);
-            il.Emit(OpCodes.Ldloc_1);
-            il.Emit(OpCodes.Ldarg_1);
-            il.Emit(OpCodes.Blt, enterLoop);
-
-            il.Emit(OpCodes.Ldloc_0);
-            il.Emit(OpCodes.Ret);
-
-            var deserializer = (ObjectDeserializer)method.CreateDelegate(typeof(ObjectDeserializer));
-            return deserializer;
-        }
-
-        #region IDisposable Members
-
-        public void Dispose()
-        {
-            _stream.Dispose();
-        }
-
-        #endregion
     }
+
+    /// <summary>
+    /// Reads data from a stream until the end is reached. The
+    /// data is returned as a byte array. An IOException is
+    /// thrown if any of the underlying IO calls fail.
+    /// </summary>
+    /// <param name="stream">The stream to read data from</param>
+    /// <param name="initialLength">The initial buffer length</param>
+    public static byte[] ReadStream(Stream stream, int initialLength)
+    {
+        // If we've been passed an unhelpful initial length, just
+        // use 32K.
+        if (initialLength < 1)
+        {
+            initialLength = 32768;
+        }
+
+        var buffer = new byte[initialLength];
+        int read = 0;
+
+        int chunk;
+        while ((chunk = stream.Read(buffer, read, buffer.Length - read)) > 0)
+        {
+            read += chunk;
+
+            // If we've reached the end of our buffer, check to see if there's
+            // any more information
+            if (read == buffer.Length)
+            {
+                int nextByte = stream.ReadByte();
+
+                // End of stream? If so, we're done
+                if (nextByte == -1)
+                {
+                    return buffer;
+                }
+
+                // Nope. Resize the buffer, put in the byte we've just
+                // read, and continue
+                var newBuffer = new byte[buffer.Length * 2];
+                Buffer.BlockCopy(buffer, 0, newBuffer, 0, buffer.Length);
+                newBuffer[read] = (byte)nextByte;
+                buffer = newBuffer;
+                read++;
+            }
+        }
+        // Buffer is now too big. Shrink it.
+        var result = new byte[read];
+        Buffer.BlockCopy(buffer, 0, result, 0, read);
+        return result;
+    }
+
+    public static byte[] ReadStream(Stream stream)
+    {
+        return ReadStream(stream, -1);
+    }
+
+    public static object ReadObjectWithType(byte[] buffer)
+    {
+        var typeLength = BitConverter.ToInt32(buffer.Slice(0, 4), 0);
+        var typeName = Encoding.UTF8.GetString(buffer.Slice(4, typeLength));
+        var reader = CreateReader(buffer.Slice(4 + typeLength, buffer.Length - 1));
+        var result = reader.ReadObject(GetType(typeName));
+        return result;
+    }
+
+    private static object ConvertIfNecessary(object value, Type objectType, ObjectTypeCode typeCode, ObjectTypeCode expectedTypeCode, bool isConvertible)
+    {
+        if (expectedTypeCode != typeCode && isConvertible)
+        {
+            return Reflector.ChangeType(value, objectType);
+        }
+        return value;
+    }
+
+    private ObjectDeserializer CreateDelegate(Type objectType)
+    {
+        var exists = true;
+        var propertyCount = -1; 
+        var propertyLength = -1;
+        if (_includePropertyNames)
+        {
+            propertyCount = (int)ReadUInt32();
+            propertyLength = (int)ReadUInt32();
+        }
+        ObjectDeserializer deserializer;
+        if (!_serializeAll)
+        {
+            deserializer = _includePropertyNames ? _deserializers.GetOrAdd(objectType, t => CreateDeserializer(t, propertyCount, ref exists)) : _deserializersNoHeader.GetOrAdd(objectType, t => CreateDeserializer(t, propertyCount, ref exists));
+        }
+        else
+        {
+            deserializer = _includePropertyNames ? _deserializersWithAllProperties.GetOrAdd(objectType, t => CreateDeserializer(t, propertyCount, ref exists)) : _deserializersWithAllPropertiesNoHeader.GetOrAdd(objectType, t => CreateDeserializer(t, propertyCount, ref exists));
+        }
+        if (exists && _includePropertyNames)
+        {
+            Skip(propertyLength);
+        }
+        return deserializer;
+    }
+
+    private ObjectDeserializer CreateDeserializer(Type objectType, int propertyCount, ref bool exists)
+    {
+        var dataEntityType = objectType.IsInterface ? ObjectFactory.Create(objectType).GetType() : objectType;
+        var propertyNames = new List<string>();
+        if (_includePropertyNames)
+        {
+            for (var i = 0; i < propertyCount; i++)
+            {
+                propertyNames.Add(ReadString());
+            }
+        }
+        exists = false;
+        return GenerateDelegate(dataEntityType, propertyNames);
+    }
+
+    private ObjectDeserializer GenerateDelegate(Type objectType, List<string> propertyNames)
+    {
+        var method = new DynamicMethod("Deserialize_" + objectType.Name, typeof(object[]), new[] { typeof(SerializationReader), typeof(int) }, typeof(SerializationReader).Module);
+        var il = method.GetILGenerator();
+
+        var readObject = GetType().GetMethod("ReadObject", new[] { typeof(Type), typeof(ObjectTypeCode), typeof(bool) });
+        var getTypeFromHandle = typeof(Type).GetMethod("GetTypeFromHandle");
+
+        var interfaceType = objectType;
+        if (Reflector.IsEmitted(objectType))
+        {
+            interfaceType = Reflector.GetInterface(objectType) ?? objectType;
+        }
+
+        var properties = Reflector.GetAllProperties(interfaceType);
+        PropertyInfo[] orderedProperties;
+        if(_includePropertyNames)
+        {
+            orderedProperties = properties.Where(p => propertyNames.Contains(p.Name)).Arrange(propertyNames, p => p.Name).ToArray();
+        }
+        else
+        {
+            var propertyPositions = Reflector.GetAllPropertyPositions(interfaceType).OrderBy(p => p.Value).Select(p => p.Key);
+            orderedProperties = properties.Where(p => p.CanRead && p.CanWrite && p.Name != "Indexer" && (_serializeAll || !p.GetCustomAttributes(typeof(DoNotSerializeAttribute), false).Any())).Arrange(propertyPositions, p => p.Name).ToArray();
+        }
+
+        var enterLoop = il.DefineLabel();
+        var exitLoop = il.DefineLabel();
+        var result = il.DeclareLocal(typeof(object[]));
+        var index = il.DeclareLocal(typeof(int));
+        var value = il.DeclareLocal(interfaceType);
+
+        // Instanciate result array
+        il.Emit(OpCodes.Ldarg_1);
+        il.Emit(OpCodes.Newarr, typeof(object));
+        il.Emit(OpCodes.Stloc_0);
+
+        // Set-up loop
+        il.Emit(OpCodes.Ldc_I4_0);
+        il.Emit(OpCodes.Stloc_1);
+        il.Emit(OpCodes.Br, exitLoop);
+        il.MarkLabel(enterLoop);
+
+        // Create instance of a given type
+        il.Emit(OpCodes.Newobj, objectType.GetConstructor(Type.EmptyTypes));
+        il.Emit(OpCodes.Stloc_2);
+
+        foreach (var property in orderedProperties)
+        {
+            // Read property value
+            il.Emit(OpCodes.Ldloc_2);
+            il.Emit(OpCodes.Ldarg_0);
+            Type propertyType;
+            if (!Reflector.IsDataEntityList(property.PropertyType, out propertyType))
+            {
+                propertyType = property.PropertyType;
+            }
+            il.Emit(OpCodes.Ldtoken, propertyType);
+            il.Emit(OpCodes.Call, getTypeFromHandle);
+            il.Emit(OpCodes.Ldc_I4, (int)Reflector.GetObjectTypeCode(propertyType));
+            il.Emit(typeof(IConvertible).IsAssignableFrom(propertyType) ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Callvirt, readObject);
+            il.EmitCastToReference(property.PropertyType);
+            il.EmitCall(OpCodes.Callvirt, property.GetSetMethod(), null);
+        }
+
+        // Set array's element
+        il.Emit(OpCodes.Ldloc_0);
+        il.Emit(OpCodes.Ldloc_1);
+        il.Emit(OpCodes.Ldloc_2);
+        il.Emit(OpCodes.Stelem_Ref);
+
+        il.Emit(OpCodes.Ldloc_1);
+        il.Emit(OpCodes.Ldc_I4_1);
+        il.Emit(OpCodes.Add);
+        il.Emit(OpCodes.Stloc_1);
+        il.MarkLabel(exitLoop);
+        il.Emit(OpCodes.Ldloc_1);
+        il.Emit(OpCodes.Ldarg_1);
+        il.Emit(OpCodes.Blt, enterLoop);
+
+        il.Emit(OpCodes.Ldloc_0);
+        il.Emit(OpCodes.Ret);
+
+        var deserializer = (ObjectDeserializer)method.CreateDelegate(typeof(ObjectDeserializer));
+        return deserializer;
+    }
+
+    #region IDisposable Members
+
+    public void Dispose()
+    {
+        _stream.Dispose();
+    }
+
+    #endregion
 }

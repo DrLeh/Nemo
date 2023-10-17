@@ -1,12 +1,12 @@
 using System;
 
-namespace Nemo.Attributes.Converters
-{
+namespace Nemo.Attributes.Converters;
+
 	public class CastFromObjectConverter<T> : ITypeConverter<object, T>
 	{
 		#region ITypeConverter<F,T> Members
 		
-        T ITypeConverter<object, T>.ConvertForward(object from)
+    T ITypeConverter<object, T>.ConvertForward(object from)
 		{
 			return (T)from;
 		}
@@ -16,6 +16,5 @@ namespace Nemo.Attributes.Converters
 			return to;
 		}
 		
-        #endregion
+    #endregion
 	}
-}

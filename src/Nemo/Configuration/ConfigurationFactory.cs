@@ -7,93 +7,96 @@ using System.Threading.Tasks;
 using Nemo.Configuration.Mapping;
 using Nemo.Reflection;
 
-namespace Nemo.Configuration
+namespace Nemo.Configuration;
+
+public class ConfigurationFactory
 {
-    public class ConfigurationFactory
+    private MappingFactory MappingFactory = new();
+
+    private Lazy<INemoConfiguration>? _configuration;
+    private Lazy<INemoConfiguration> Configuration => _configuration ??= new(() =>
     {
-        private static Lazy<INemoConfiguration> _configuration = new(() =>
-        {
-            MappingFactory.Initialize();
-            return new DefaultNemoConfiguration();
-        }, true);
+        MappingFactory.Initialize();
+        return new DefaultNemoConfiguration();
+    }, true);
 
-        private static readonly ConcurrentDictionary<Type, INemoConfiguration> _typedConfigurations = new();
+    private readonly ConcurrentDictionary<Type, INemoConfiguration> _typedConfigurations = new();
 
-        public static string DefaultConnectionName
+    public string DefaultConnectionName
+    {
+        get { return DefaultConfiguration.DefaultConnectionName; }
+    }
+
+    public INemoConfiguration DefaultConfiguration
+    {
+        get
         {
-            get { return DefaultConfiguration.DefaultConnectionName; }
+            return Configuration.Value;
         }
+    }
 
-        public static INemoConfiguration DefaultConfiguration
+    public INemoConfiguration Configure(Func<INemoConfiguration>? config = null)
+    {
+        if (Configuration.IsValueCreated)
+            return null;
+
+        MappingFactory.Initialize();
+        if (config != null)
         {
-            get
-            {
-                return _configuration.Value;
-            }
+            _configuration = new Lazy<INemoConfiguration>(config, true);
         }
+        return Configuration.Value;
+    }
 
-        public static INemoConfiguration Configure(Func<INemoConfiguration> config = null)
-        {
-            if (_configuration.IsValueCreated) return null;
+    public void RefreshEntityMappings()
+    {
+        MappingFactory.Initialize();
+    }
 
-            MappingFactory.Initialize();
-            if (config != null)
-            {
-                _configuration = new Lazy<INemoConfiguration>(config, true);
-            }
-            return _configuration.Value;
-        }
+    public INemoConfiguration CloneCurrentConfiguration()
+    {
+        var clone = new DefaultNemoConfiguration();
+        return clone.Merge(Configuration.Value);
+    }
 
-        public static void RefreshEntityMappings()
-        {
-            MappingFactory.Initialize();
-        }
+    public INemoConfiguration CloneConfiguration(INemoConfiguration config)
+    {
+        if (config == null) return null;
 
-        public static INemoConfiguration CloneCurrentConfiguration()
-        {
-            var clone = new DefaultNemoConfiguration();
-            return clone.Merge(_configuration.Value);
-        }
+        var clone = new DefaultNemoConfiguration();
+        return clone.Merge(config);
+    }
 
-        public static INemoConfiguration CloneConfiguration(INemoConfiguration config)
-        {
-            if (config == null) return null;
+    public INemoConfiguration Get<T>()
+    {
+        return Get(typeof(T));
+    }
 
-            var clone = new DefaultNemoConfiguration();
-            return clone.Merge(config);
-        }
+    public INemoConfiguration Get(Type type)
+    {
+        var globalConfig = DefaultConfiguration;
+        if (!IsConfigurable(type)) return globalConfig;
 
-        public static INemoConfiguration Get<T>()
-        {
-            return Get(typeof(T));
-        }
+        if (_typedConfigurations.TryGetValue(type, out var typedConfig)) return typedConfig;
+        return globalConfig;
+    }
 
-        public static INemoConfiguration Get(Type type)
-        {
-            var globalConfig = DefaultConfiguration;
-            if (!IsConfigurable(type)) return globalConfig;
+    public void Set<T>(INemoConfiguration configuration)
+    {
+        Set(typeof(T), configuration);
+    }
 
-            if (_typedConfigurations.TryGetValue(type, out var typedConfig)) return typedConfig;    
-            return globalConfig;
-        }
+    public void Set(Type type, INemoConfiguration configuration)
+    {
+        if (configuration == null || !IsConfigurable(type)) return;
 
-        public static void Set<T>(INemoConfiguration configuration)
-        {
-            Set(typeof(T), configuration);
-        }
+        var globalConfig = DefaultConfiguration;
+        _typedConfigurations[type] = configuration.Merge(globalConfig);
+    }
 
-        public static void Set(Type type, INemoConfiguration configuration)
-        {
-            if (configuration == null || !IsConfigurable(type)) return;
-
-            var globalConfig = DefaultConfiguration;
-            _typedConfigurations[type] =  configuration.Merge(globalConfig);
-        }
-
-        private static bool IsConfigurable(Type type)
-        {
-            var refletectType = Reflector.GetReflectedType(type);
-            return !refletectType.IsSimpleType && !refletectType.IsSimpleList;
-        }
+    private bool IsConfigurable(Type type)
+    {
+        var refletectType = Reflector.GetReflectedType(type);
+        return !refletectType.IsSimpleType && !refletectType.IsSimpleList;
     }
 }

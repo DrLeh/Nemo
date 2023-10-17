@@ -1,7 +1,6 @@
-﻿namespace Nemo.Logging
+﻿namespace Nemo.Logging;
+
+public interface IAuditLogProvider
 {
-    public interface IAuditLogProvider
-    {
-        void Write<T>(AuditLog<T> auditTrail);
-    }
+    void Write<T>(AuditLog<T> auditTrail);
 }

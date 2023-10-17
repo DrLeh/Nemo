@@ -4,35 +4,34 @@ using System.Linq;
 using System.Text;
 using Nemo.Extensions;
 
-namespace Nemo.Collections
+namespace Nemo.Collections;
+
+internal class TypeArray : IEqualityComparer<TypeArray>
 {
-    internal class TypeArray : IEqualityComparer<TypeArray>
+    private readonly IList<Type> _types;
+    private readonly Lazy<int> _hashCode;
+
+    public TypeArray(IList<Type> types)
     {
-        private readonly IList<Type> _types;
-        private readonly Lazy<int> _hashCode;
+        _types = types;
+        _hashCode = new Lazy<int>(() => _types.Select(t => t.FullName).ToDelimitedString("|").GetHashCode(), true);
+    }
 
-        public TypeArray(IList<Type> types)
+    public IList<Type> Types
+    {
+        get
         {
-            _types = types;
-            _hashCode = new Lazy<int>(() => _types.Select(t => t.FullName).ToDelimitedString("|").GetHashCode(), true);
+            return _types;
         }
+    }
 
-        public IList<Type> Types
-        {
-            get
-            {
-                return _types;
-            }
-        }
+    public bool Equals(TypeArray x, TypeArray y)
+    {
+        return (x._types?.SequenceEqual(y._types, EqualityComparer<Type>.Default)).GetValueOrDefault();
+    }
 
-        public bool Equals(TypeArray x, TypeArray y)
-        {
-            return (x._types?.SequenceEqual(y._types, EqualityComparer<Type>.Default)).GetValueOrDefault();
-        }
-
-        public int GetHashCode(TypeArray obj)
-        {
-            return obj._hashCode.Value;
-        }
+    public int GetHashCode(TypeArray obj)
+    {
+        return obj._hashCode.Value;
     }
 }

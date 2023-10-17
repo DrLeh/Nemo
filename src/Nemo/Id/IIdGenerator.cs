@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo.Id
+namespace Nemo.Id;
+
+public interface IIdGenerator
 {
-    public interface IIdGenerator
-    {
-        object Generate();
-    }
+    object Generate();
 }

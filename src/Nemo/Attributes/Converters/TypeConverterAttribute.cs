@@ -2,8 +2,8 @@ using System;
 using System.Linq;
 using System.Reflection;
 
-namespace Nemo.Attributes.Converters
-{
+namespace Nemo.Attributes.Converters;
+
 	/// <summary>Associate type converter types list to a property.</summary>
 	[AttributeUsage(AttributeTargets.Property, Inherited = true, AllowMultiple = true)]
 	public class TypeConverterAttribute : Attribute
@@ -70,7 +70,7 @@ namespace Nemo.Attributes.Converters
 	    /// <param name="toType"></param>
 	    internal static void ValidateTypeConverterType(Type converterType, Type fromType, Type toType)
 		{
-            if (converterType == null)
+        if (converterType == null)
 			{
 				if (fromType != toType && fromType.IsAssignableFrom(toType))
 				{
@@ -80,19 +80,19 @@ namespace Nemo.Attributes.Converters
 			else
 			{
 				var expectedInterfaceType = GetExpectedConverterInterfaceType(fromType, toType);
-                var converterIntefaces = converterType.GetInterfaces();
+            var converterIntefaces = converterType.GetInterfaces();
 
-                if (converterType.IsAbstract)
+            if (converterType.IsAbstract)
 				{
-                    throw new TypeConverterException($"Can't use {converterType.FullName} as a converter because it is abstract.");
+                throw new TypeConverterException($"Can't use {converterType.FullName} as a converter because it is abstract.");
 				}
-                if (converterType.GetConstructor(Type.EmptyTypes) == null)
+            if (converterType.GetConstructor(Type.EmptyTypes) == null)
 				{
-                    throw new TypeConverterException($"Can't use {converterType.FullName} as a converter because it doesn't have a default constructor.");
+                throw new TypeConverterException($"Can't use {converterType.FullName} as a converter because it doesn't have a default constructor.");
 				}
 				if (Array.IndexOf(converterIntefaces, expectedInterfaceType) == -1)
 				{
-                    throw new TypeConverterException($"Can't use {converterType.FullName} as a converter because it doesn't implement {expectedInterfaceType.FullName}.");
+                throw new TypeConverterException($"Can't use {converterType.FullName} as a converter because it doesn't implement {expectedInterfaceType.FullName}.");
 				}
 			}
 		}
@@ -135,23 +135,22 @@ namespace Nemo.Attributes.Converters
 			return result;
 		}
 
-        internal static Tuple<Type, Type> GetTypeConverter(Type indexerType, PropertyInfo property)
+    internal static Tuple<Type, Type> GetTypeConverter(Type indexerType, PropertyInfo property)
+    {
+        var propertyType = property.PropertyType;
+        var typeConverterAttribute = GetTypeConverter(property);
+
+        Type typeConverterType = null;
+        Type typeConverterInterfaceType = null;
+
+        if (typeConverterAttribute != null && typeConverterAttribute.TypeConverterType != null)
         {
-            var propertyType = property.PropertyType;
-            var typeConverterAttribute = GetTypeConverter(property);
-
-            Type typeConverterType = null;
-            Type typeConverterInterfaceType = null;
-
-            if (typeConverterAttribute != null && typeConverterAttribute.TypeConverterType != null)
-            {
-                ValidateTypeConverterType(typeConverterAttribute.TypeConverterType, indexerType, propertyType);
-                typeConverterType = typeConverterAttribute.TypeConverterType;
-                typeConverterInterfaceType = GetExpectedConverterInterfaceType(indexerType, propertyType);
-            }
-
-            return Tuple.Create(typeConverterType, typeConverterInterfaceType);
+            ValidateTypeConverterType(typeConverterAttribute.TypeConverterType, indexerType, propertyType);
+            typeConverterType = typeConverterAttribute.TypeConverterType;
+            typeConverterInterfaceType = GetExpectedConverterInterfaceType(indexerType, propertyType);
         }
 
+        return Tuple.Create(typeConverterType, typeConverterInterfaceType);
+    }
+
 	}
-}

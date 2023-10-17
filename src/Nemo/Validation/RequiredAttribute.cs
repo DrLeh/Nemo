@@ -3,30 +3,29 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo.Validation
+namespace Nemo.Validation;
+
+public class RequiredAttribute : System.ComponentModel.DataAnnotations.RequiredAttribute, ISeverityTypeProvider, IResourceKeyProvider
 {
-    public class RequiredAttribute : System.ComponentModel.DataAnnotations.RequiredAttribute, ISeverityTypeProvider, IResourceKeyProvider
+    public RequiredAttribute() : base() { }
+
+    public SeverityType SeverityType
     {
-        public RequiredAttribute() : base() { }
+        get;
+        set;
+    }
 
-        public SeverityType SeverityType
+    private string _resourceKey = null;
+    public string ResourceKey
+    {
+        get
         {
-            get;
-            set;
+            return _resourceKey;
         }
-
-        private string _resourceKey = null;
-        public string ResourceKey
+        set
         {
-            get
-            {
-                return _resourceKey;
-            }
-            set
-            {
-                _resourceKey = value;
-                this.SetErrorMessage();
-            }
+            _resourceKey = value;
+            this.SetErrorMessage();
         }
     }
 }

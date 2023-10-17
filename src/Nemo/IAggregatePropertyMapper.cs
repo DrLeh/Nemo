@@ -1,9 +1,8 @@
-﻿namespace Nemo
+﻿namespace Nemo;
+
+public interface IAggregatePropertyMapper<TAggregateRoot, T>
+     where TAggregateRoot : class
+     where T : class
 {
-    public interface IAggregatePropertyMapper<TAggregateRoot, T>
-         where TAggregateRoot : class
-         where T : class
-    {
-        TAggregateRoot Map(TAggregateRoot aggregate, T entity);
-    }
+    TAggregateRoot Map(TAggregateRoot aggregate, T entity);
 }

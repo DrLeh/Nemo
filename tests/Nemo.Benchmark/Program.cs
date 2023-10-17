@@ -2,19 +2,18 @@
 using BenchmarkDotNet.Running;
 using System;
 
-namespace Nemo.Benchmark
+namespace Nemo.Benchmark;
+
+class Program
 {
-    class Program
+    static void Main(string[] args)
     {
-        static void Main(string[] args)
-        {
 #if DEBUG
-            var summary = BenchmarkRunner.Run<OrmBenchmark>(new DebugInProcessConfig());
+        var summary = BenchmarkRunner.Run<OrmBenchmark>(new DebugInProcessConfig());
 #else
-            var summary = BenchmarkRunner.Run<OrmBenchmark>();
+        var summary = BenchmarkRunner.Run<OrmBenchmark>();
 #endif
-            Console.WriteLine(summary.Reports.Length);
-            Console.ReadLine();
-        }
+        Console.WriteLine(summary.Reports.Length);
+        Console.ReadLine();
     }
 }

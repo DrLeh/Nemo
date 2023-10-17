@@ -1,17 +1,17 @@
 using System;
 using System.Collections.Generic;
 
-namespace Nemo.Attributes.Converters
-{
+namespace Nemo.Attributes.Converters;
+
 	public class EnumConverter<T> : ITypeConverter<object, T> 
-        where T : struct
+    where T : struct
 	{
 		#region ITypeConverter<object,T> Members
 		
-        T ITypeConverter<object, T>.ConvertForward(object from)
+    T ITypeConverter<object, T>.ConvertForward(object from)
 		{
 			switch(from)
-            {
+        {
 				case T t:
 					return t;
 				case int i:
@@ -33,9 +33,9 @@ namespace Nemo.Attributes.Converters
 			}
 
 			if (!Enum.TryParse<T>(Convert.ToString(from), out var result))
-            {
-                result = default;
-            }
+        {
+            result = default;
+        }
 
 			return result;
 		}
@@ -45,6 +45,5 @@ namespace Nemo.Attributes.Converters
 			return to;
 		}
 		
-        #endregion
+    #endregion
 	}
-}

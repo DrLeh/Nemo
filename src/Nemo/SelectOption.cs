@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo
+namespace Nemo;
+
+public enum SelectOption : ushort
 {
-    public enum SelectOption : ushort
-    {
-        All,
-        First,
-        FirstOrDefault
-    }
+    All,
+    First,
+    FirstOrDefault
 }

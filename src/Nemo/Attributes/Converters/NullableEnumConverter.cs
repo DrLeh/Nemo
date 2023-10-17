@@ -1,7 +1,7 @@
 using System;
 
-namespace Nemo.Attributes.Converters
-{
+namespace Nemo.Attributes.Converters;
+
 	public class NullableEnumConverter<T> : ITypeConverter<object, T?>
 		where T : struct //	Should actually be an enum
 	{
@@ -35,4 +35,3 @@ namespace Nemo.Attributes.Converters
 
 		#endregion
 	}
-}

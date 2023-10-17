@@ -3,25 +3,24 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo.Collections.Comparers
+namespace Nemo.Collections.Comparers;
+
+public class ComparerProxy<T> : IComparer<T>
 {
-    public class ComparerProxy<T> : IComparer<T>
+    private readonly IComparer<T>[] _comparers;
+
+    public ComparerProxy(params IComparer<T>[] comparers)
     {
-        private readonly IComparer<T>[] _comparers;
+        _comparers = comparers;
+    }
 
-        public ComparerProxy(params IComparer<T>[] comparers)
-        {
-            _comparers = comparers;
-        }
+    public int Compare(T x, T y)
+    {
+        int retVal = 0, i = 0;
 
-        public int Compare(T x, T y)
-        {
-            int retVal = 0, i = 0;
+        while (retVal == 0 && i < _comparers.Length)
+            retVal = _comparers[i++].Compare(x, y);
 
-            while (retVal == 0 && i < _comparers.Length)
-                retVal = _comparers[i++].Compare(x, y);
-
-            return retVal;
-        }
+        return retVal;
     }
 }

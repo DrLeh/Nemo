@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo.Validation
+namespace Nemo.Validation;
+
+public interface IResourceKeyProvider
 {
-    public interface IResourceKeyProvider
+    string ResourceKey
     {
-        string ResourceKey
-        {
-            get;
-            set;
-        }
+        get;
+        set;
     }
 }

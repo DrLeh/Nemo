@@ -3,13 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo.UnitOfWork
+namespace Nemo.UnitOfWork;
+
+public enum ChangeTrackingMode
 {
-    public enum ChangeTrackingMode
-    {
-        Default,
-        Automatic,
-        Manual,
-        Debug
-    }
+    Default,
+    Automatic,
+    Manual,
+    Debug
 }

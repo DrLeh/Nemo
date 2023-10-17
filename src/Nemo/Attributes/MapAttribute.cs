@@ -1,9 +1,9 @@
 using System;
 using System.Reflection;
 
-namespace Nemo.Attributes
-{
-    public abstract class MapAttribute : Attribute
+namespace Nemo.Attributes;
+
+public abstract class MapAttribute : Attribute
 	{
 		private readonly string _sourceName;
 
@@ -17,4 +17,3 @@ namespace Nemo.Attributes
 			get { return _sourceName; }
 		}
 	}
-}

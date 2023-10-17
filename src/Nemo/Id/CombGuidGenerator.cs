@@ -4,21 +4,20 @@ using System.Linq;
 using System.Text;
 using Nemo.Utilities;
 
-namespace Nemo.Id
-{
-    public class CombGuidGenerator : IIdGenerator
-    {
-        public object Generate()
-        {
-            return CombGuid.Generate();
-        }
-    }
+namespace Nemo.Id;
 
-    public class CombGuidStringGenerator : IIdGenerator
+public class CombGuidGenerator : IIdGenerator
+{
+    public object Generate()
     {
-        public object Generate()
-        {
-            return CombGuid.Generate().ToString("N");
-        }
+        return CombGuid.Generate();
+    }
+}
+
+public class CombGuidStringGenerator : IIdGenerator
+{
+    public object Generate()
+    {
+        return CombGuid.Generate().ToString("N");
     }
 }

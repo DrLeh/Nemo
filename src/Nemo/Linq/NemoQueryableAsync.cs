@@ -7,76 +7,75 @@ using System.Threading;
 using Nemo.Configuration;
 using Nemo.Extensions;
 
-namespace Nemo.Linq
+namespace Nemo.Linq;
+
+public class NemoQueryableAsync<T> : IOrderedAsyncQueryable<T>
 {
-    public class NemoQueryableAsync<T> : IOrderedAsyncQueryable<T>
+    private readonly NemoQueryProvider _provider;
+    private readonly Expression _expression;
+    private readonly CancellationToken _cancellationToken;
+    private readonly CancellationTokenSource _tokenSource = new CancellationTokenSource();
+
+    public NemoQueryableAsync(DbConnection connection, INemoConfiguration config, CancellationToken cancellationToken)
     {
-        private readonly NemoQueryProvider _provider;
-        private readonly Expression _expression;
-        private readonly CancellationToken _cancellationToken;
-        private readonly CancellationTokenSource _tokenSource = new CancellationTokenSource();
+        _provider = new NemoQueryProvider(connection, config);
+        _expression = Expression.Constant(this);
+        _cancellationToken = cancellationToken == CancellationToken.None ? _tokenSource.Token : _cancellationToken;
+    }
 
-        public NemoQueryableAsync(DbConnection connection, INemoConfiguration config, CancellationToken cancellationToken)
+    public NemoQueryableAsync() : this(CancellationToken.None)
+    {
+    }
+
+    public NemoQueryableAsync(CancellationToken cancellationToken) : this((DbConnection)null, null, cancellationToken)
+    {
+    }
+
+    public NemoQueryableAsync(DbConnection connection) : this(connection, null, CancellationToken.None)
+    {
+    }
+
+    public NemoQueryableAsync(INemoConfiguration config) : this(null, config, CancellationToken.None)
+    {
+    }
+
+    public NemoQueryableAsync(NemoQueryProvider provider, Expression expression, CancellationToken cancellationToken)
+    {
+        provider.ThrowIfNull("provider");
+        expression.ThrowIfNull("expression");
+
+        _provider = provider;
+        _expression = expression;
+        _cancellationToken = cancellationToken == CancellationToken.None ? _tokenSource.Token : _cancellationToken;
+    }
+
+    public NemoQueryableAsync(NemoQueryProvider provider, Expression expression) : this(provider, expression, CancellationToken.None)
+    {
+    }
+
+    public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+    {
+        return Provider.ExecuteAsync<T>(Expression, _cancellationToken).AsTask().ToAsyncEnumerable().GetAsyncEnumerator();
+    }
+
+    public Type ElementType
+    {
+        get { return typeof(T); }
+    }
+
+    public Expression Expression
+    {
+        get
         {
-            _provider = new NemoQueryProvider(connection, config);
-            _expression = Expression.Constant(this);
-            _cancellationToken = cancellationToken == CancellationToken.None ? _tokenSource.Token : _cancellationToken;
+            return _expression;
         }
+    }
 
-        public NemoQueryableAsync() : this(CancellationToken.None)
+    public IAsyncQueryProvider Provider
+    {
+        get
         {
-        }
-
-        public NemoQueryableAsync(CancellationToken cancellationToken) : this((DbConnection)null, null, cancellationToken)
-        {
-        }
-
-        public NemoQueryableAsync(DbConnection connection) : this(connection, null, CancellationToken.None)
-        {
-        }
-
-        public NemoQueryableAsync(INemoConfiguration config) : this(null, config, CancellationToken.None)
-        {
-        }
-
-        public NemoQueryableAsync(NemoQueryProvider provider, Expression expression, CancellationToken cancellationToken)
-        {
-            provider.ThrowIfNull("provider");
-            expression.ThrowIfNull("expression");
-
-            _provider = provider;
-            _expression = expression;
-            _cancellationToken = cancellationToken == CancellationToken.None ? _tokenSource.Token : _cancellationToken;
-        }
-
-        public NemoQueryableAsync(NemoQueryProvider provider, Expression expression) : this(provider, expression, CancellationToken.None)
-        {
-        }
-
-        public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
-        {
-            return Provider.ExecuteAsync<T>(Expression, _cancellationToken).AsTask().ToAsyncEnumerable().GetAsyncEnumerator();
-        }
-
-        public Type ElementType
-        {
-            get { return typeof(T); }
-        }
-
-        public Expression Expression
-        {
-            get
-            {
-                return _expression;
-            }
-        }
-
-        public IAsyncQueryProvider Provider
-        {
-            get
-            {
-                return _provider;
-            }
+            return _provider;
         }
     }
 }

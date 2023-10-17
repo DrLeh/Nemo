@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo
+namespace Nemo;
+
+public enum MaterializationMode
 {
-    public enum MaterializationMode
-    {
-        Default,
-        Partial,     
-        Exact
-    }
+    Default,
+    Partial,     
+    Exact
 }

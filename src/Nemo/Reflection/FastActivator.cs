@@ -3,53 +3,52 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Nemo.Reflection
+namespace Nemo.Reflection;
+
+internal class FastActivator<T>
 {
-    internal class FastActivator<T>
+    static FastActivator()
     {
-        static FastActivator()
-        {
-            InstanceBuilder = Activator.CreateDelegate(typeof(T));
-        }
-
-        internal static T New()
-        {
-            return (T)InstanceBuilder();
-        }
-
-        // ReSharper disable once StaticMemberInGenericType
-        private static readonly Activator.ObjectActivator InstanceBuilder;
+        InstanceBuilder = Activator.CreateDelegate(typeof(T));
     }
 
-    internal class FastActivator<T1, T2>
+    internal static T New()
     {
-        static FastActivator()
-        {
-            InstanceBuilder = Activator.CreateDelegate(typeof(T1), typeof(T2));
-        }
-
-        internal static T1 New(T2 p)
-        {
-            return (T1)InstanceBuilder(p);
-        }
-
-        // ReSharper disable once StaticMemberInGenericType
-        private static readonly Activator.ObjectActivator InstanceBuilder;
+        return (T)InstanceBuilder();
     }
 
-    internal class FastActivator<T1, T2, T3>
+    // ReSharper disable once StaticMemberInGenericType
+    private static readonly Activator.ObjectActivator InstanceBuilder;
+}
+
+internal class FastActivator<T1, T2>
+{
+    static FastActivator()
     {
-        static FastActivator()
-        {
-            InstanceBuilder = Activator.CreateDelegate(typeof(T1), typeof(T2), typeof(T3));
-        }
-
-        internal static T1 New(T2 p1, T3 p2)
-        {
-            return (T1)InstanceBuilder(p1, p2);
-        }
-
-        // ReSharper disable once StaticMemberInGenericType
-        private static readonly Activator.ObjectActivator InstanceBuilder;
+        InstanceBuilder = Activator.CreateDelegate(typeof(T1), typeof(T2));
     }
+
+    internal static T1 New(T2 p)
+    {
+        return (T1)InstanceBuilder(p);
+    }
+
+    // ReSharper disable once StaticMemberInGenericType
+    private static readonly Activator.ObjectActivator InstanceBuilder;
+}
+
+internal class FastActivator<T1, T2, T3>
+{
+    static FastActivator()
+    {
+        InstanceBuilder = Activator.CreateDelegate(typeof(T1), typeof(T2), typeof(T3));
+    }
+
+    internal static T1 New(T2 p1, T3 p2)
+    {
+        return (T1)InstanceBuilder(p1, p2);
+    }
+
+    // ReSharper disable once StaticMemberInGenericType
+    private static readonly Activator.ObjectActivator InstanceBuilder;
 }

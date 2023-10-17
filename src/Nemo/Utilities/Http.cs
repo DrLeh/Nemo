@@ -4,25 +4,24 @@ using System.Linq;
 using System.Text;
 using System.Collections.Specialized;
 
-namespace Nemo.Utilities
+namespace Nemo.Utilities;
+
+public static class Http
 {
-    public static class Http
+    public static NameValueCollection ParseQueryString(string queryString)
     {
-        public static NameValueCollection ParseQueryString(string queryString)
+        var queryParameters = new NameValueCollection(StringComparer.OrdinalIgnoreCase);
+        var querySegments = queryString.Split('&');
+        foreach (var segment in querySegments)
         {
-            var queryParameters = new NameValueCollection(StringComparer.OrdinalIgnoreCase);
-            var querySegments = queryString.Split('&');
-            foreach (var segment in querySegments)
-            {
-                var parts = segment.Split('=');
-                if (parts.Length <= 0) continue;
+            var parts = segment.Split('=');
+            if (parts.Length <= 0) continue;
 
-                var key = parts[0].Trim('?', ' ');
-                var val = Uri.UnescapeDataString(parts[1].Trim());
+            var key = parts[0].Trim('?', ' ');
+            var val = Uri.UnescapeDataString(parts[1].Trim());
 
-                queryParameters.Add(key, val);
-            }
-            return queryParameters;
+            queryParameters.Add(key, val);
         }
+        return queryParameters;
     }
 }

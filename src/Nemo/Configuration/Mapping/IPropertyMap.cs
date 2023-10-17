@@ -5,10 +5,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Nemo.Configuration.Mapping
+namespace Nemo.Configuration.Mapping;
+
+public interface IPropertyMap
 {
-    public interface IPropertyMap
-    {
-        ReflectedProperty Property { get; }
-    }
+    ReflectedProperty Property { get; }
 }

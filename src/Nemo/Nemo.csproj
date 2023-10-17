@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net472;netstandard2.0;netstandard2.1</TargetFrameworks>
+    <TargetFramework>net7.0</TargetFramework>
     <RestorePackages>true</RestorePackages>
     <RequireLicenseAcceptance>false</RequireLicenseAcceptance>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -11,10 +11,7 @@
     <NeutralLanguage>en-US</NeutralLanguage>
     <AssemblyName>Nemo</AssemblyName>
     <AssemblyTitle>Nemo</AssemblyTitle>
-    <AssemblyVersion>2.8.4</AssemblyVersion>
-    <FileVersion>2.8.4</FileVersion>
-    <PackageVersion>2.8.4</PackageVersion>
-    <RootNamespace>Nemo</RootNamespace>
+    <Version>3.0.0-beta</Version>
 
     <PackageId>Nemo</PackageId>
     <Title>Nemo</Title>
@@ -24,15 +21,14 @@
     <Copyright>Copyright © Max Stepanskiy 2012-2023</Copyright>
     <PackageProjectUrl>https://github.com/stepaside/Nemo/wiki</PackageProjectUrl>
     <PackageTags>ORM micro-ORM data-mapper sql-mapper</PackageTags>
-    
+
     <RepositoryUrl>https://github.com/stepaside/Nemo</RepositoryUrl>
     <RepositoryType>Github</RepositoryType>
 
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-
-    <LangVersion>10.0</LangVersion>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
   <PropertyGroup>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -41,32 +37,20 @@
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
-  
+
   <!-- common NuGet package refs that affect all projects -->
   <ItemGroup>
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageReference Include="System.Data.SqlClient" Version="4.8.5" />
     <PackageReference Include="System.Interactive" Version="6.0.1" />
     <PackageReference Include="System.Interactive.Async.Providers" Version="6.0.1" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1'">
-	<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="6.0.0" />
-	<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
-	<PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
     <PackageReference Include="System.Reflection.Emit" Version="4.7.0" />
     <PackageReference Include="System.Reflection.Emit.ILGeneration" Version="4.7.0" />
     <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.7.0" />
-	<PackageReference Include="System.Configuration.ConfigurationManager" Version="6.0.0" />
-	<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="6.0.0" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
-	<Reference Include="System.ComponentModel.DataAnnotations" />
-	<Reference Include="System.Data.DataSetExtensions" />
-	<Reference Include="System.Runtime.Caching" />
-	<Reference Include="System.Runtime.Serialization" />
-	<Reference Include="System.Transactions" />
-    <Reference Include="System.Configuration" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="6.0.0" />
   </ItemGroup>
 </Project>
